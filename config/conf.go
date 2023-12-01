@@ -1,16 +1,12 @@
 package config
 
 import (
-	_ "embed"
 	"encoding/json"
 	"errors"
 	"fmt"
 
 	"github.com/xeipuuv/gojsonschema"
 )
-
-//go:embed schemas/cluster.json
-var BaseSchema string
 
 const ASTOOLS_CONF_DIR = "/etc/aerospike"
 const ASTOOLS_CONF_NAME = "astools.conf"

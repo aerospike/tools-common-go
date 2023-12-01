@@ -117,7 +117,7 @@ func Test_Config_ValidateConf(t *testing.T) {
 		{
 			name: "passes validation, toml",
 			args: args{
-				schema: BaseSchema,
+				schema: ToolsAerospikeClusterSchema,
 			},
 			wantErr: false,
 			config:  NewConfig(fileLoaderTOML),
@@ -125,7 +125,7 @@ func Test_Config_ValidateConf(t *testing.T) {
 		{
 			name: "passes validation, yaml",
 			args: args{
-				schema: BaseSchema,
+				schema: ToolsAerospikeClusterSchema,
 			},
 			wantErr: false,
 			config:  NewConfig(fileLoaderYAML),
@@ -133,7 +133,7 @@ func Test_Config_ValidateConf(t *testing.T) {
 		{
 			name: "fails validation, toml",
 			args: args{
-				schema: BaseSchema,
+				schema: ToolsAerospikeClusterSchema,
 			},
 			wantErr: true,
 			config:  NewConfig(&failsValidationLoader),
@@ -141,7 +141,7 @@ func Test_Config_ValidateConf(t *testing.T) {
 		{
 			name: "fails to load",
 			args: args{
-				schema: BaseSchema,
+				schema: ToolsAerospikeClusterSchema,
 			},
 			wantErr: true,
 			config:  NewConfig(&failsLoader),

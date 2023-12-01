@@ -1,6 +1,7 @@
 package config
 
 import (
+	_ "embed"
 	"fmt"
 	"testing"
 
@@ -382,6 +383,59 @@ func TestToolsConfig_GetConfig(t *testing.T) {
 			}
 			if diff := deep.Equal(got, tt.want); diff != nil {
 				t.Error(diff)
+			}
+		})
+	}
+}
+
+func TestToolsConfig_ValidateConfig(t *testing.T) {
+	testConfig := Config{
+		Loader: &ConfigLoader{
+			[]ConfigGetter{
+				&ConfigGetterBytes{
+					ConfigData: []byte(confTOML),
+				},
+			},
+			[]ConfigUnmarshaller{
+				&ConfigUnmarshallerTOML{},
+			},
+		},
+	}
+
+	type fields struct {
+		Config   Config
+		Instance string
+		Sections []string
+	}
+	type args struct {
+		schema string
+	}
+	tests := []struct {
+		name    string
+		fields  fields
+		args    args
+		wantErr bool
+	}{
+		{
+			name: "basic positive",
+			fields: fields{
+				Config: testConfig,
+			},
+			args: args{
+				schema: ToolsAerospikeClusterSchema,
+			},
+			wantErr: false,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			o := &ToolsConfig{
+				Config:   tt.fields.Config,
+				Instance: tt.fields.Instance,
+				Sections: tt.fields.Sections,
+			}
+			if err := o.ValidateConfig(tt.args.schema); (err != nil) != tt.wantErr {
+				t.Errorf("ToolsConfig.ValidateConfig() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})
 	}

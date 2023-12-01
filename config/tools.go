@@ -1,31 +1,15 @@
 package config
 
 import (
+	_ "embed"
 	"fmt"
 	"strings"
 
 	"github.com/spf13/pflag"
 )
 
-// type AerospikeClusterConfig struct {
-// 	Host              string `mapstructure:"host"`
-// 	ServicesAlternate bool   `mapstructure:"services-alternate"`
-// 	Port              int    `mapstructure:"port"`
-// 	User              string `mapstructure:"user"`
-// 	Password          string `mapstructure:"password"`
-// 	Auth              string `mapstructure:"auth"`
-// 	TLSEnable         bool   `mapstructure:"tls-enable"`
-// 	TLSName           string `mapstructure:"tls-name"`
-// 	TLSCipherSuite    string `mapstructure:"tls-cipher-suite"`
-// 	TLSCRLCheck       bool   `mapstructure:"tls-crl-check"`
-// 	TLSCRLCheckAll    bool   `mapstructure:"tls-crl-check-all"`
-// 	TLSKeyFile        string `mapstructure:"tls-keyfile"`
-// 	TLSCAFile         string `mapstructure:"tls-keyfile-password"`
-// 	TLSCAPath         string `mapstructure:"tls-cafile"`
-// 	TLSCertFile       string `mapstructure:"tls-certfile"`
-// 	// TLSCertBlacklist  string // DEPRECATED `mapstructure:"tls-cert-blacklist"`
-// 	TLSProtocols string `mapstructure:"tls-protocols"`
-// }
+//go:embed schemas/cluster.json
+var ToolsAerospikeClusterSchema string
 
 type ToolsConfig struct {
 	Config
@@ -40,6 +24,15 @@ func (o *ToolsConfig) GetConfig() (map[string]any, error) {
 	}
 
 	return o.Data, nil
+}
+
+func (o *ToolsConfig) ValidateConfig(schema string) error {
+	err := o.Load()
+	if err != nil {
+		return err
+	}
+
+	return o.Config.ValidateConfig(schema)
 }
 
 func (o *ToolsConfig) Load() error {
