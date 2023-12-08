@@ -50,7 +50,7 @@ func Test_Config_GetConfig(t *testing.T) {
 		{
 			name: "basic toml",
 			config: NewConfig(
-				NewDefaultConfigLoaderFile(filepath.Join(testConfigPath, "basic.toml")),
+				NewToolsConfigLoaderFile(filepath.Join(testConfigPath, "basic.toml")),
 			),
 			want:    basicResTOML,
 			wantErr: false,
@@ -58,7 +58,7 @@ func Test_Config_GetConfig(t *testing.T) {
 		{
 			name: "basic yaml",
 			config: NewConfig(
-				NewDefaultConfigLoaderFile(filepath.Join(testConfigPath, "basic.yaml")),
+				NewToolsConfigLoaderFile(filepath.Join(testConfigPath, "basic.yaml")),
 			),
 			want:    basicResYAML,
 			wantErr: false,
@@ -81,10 +81,10 @@ func Test_Config_GetConfig(t *testing.T) {
 func Test_Config_ValidateConf(t *testing.T) {
 
 	basicTOMLPath := filepath.Join(testConfigPath, "basic.toml")
-	fileLoaderTOML := NewDefaultConfigLoaderFile(basicTOMLPath)
+	fileLoaderTOML := NewToolsConfigLoaderFile(basicTOMLPath)
 
 	basicYAMLPath := filepath.Join(testConfigPath, "basic.yaml")
-	fileLoaderYAML := NewDefaultConfigLoaderFile(basicYAMLPath)
+	fileLoaderYAML := NewToolsConfigLoaderFile(basicYAMLPath)
 
 	failsLoader := ConfigLoader{
 		Getters: []ConfigGetter{

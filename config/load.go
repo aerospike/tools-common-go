@@ -6,14 +6,20 @@ import (
 	"path/filepath"
 )
 
+// ConfigGetter is an interface for getting
+// config file text
 type ConfigGetter interface {
 	GetConfig() ([]byte, error)
 }
 
+// ConfigUnmarshaller is an interface for
+// unmarshalling config text into a destination
 type ConfigUnmarshaller interface {
 	Unmarshal(data []byte, v any) error
 }
 
+// ConfigLoader is a struct used to get
+// and unmarshal config data
 type ConfigLoader struct {
 	Getters       []ConfigGetter
 	Unmarshallers []ConfigUnmarshaller
@@ -25,7 +31,7 @@ var (
 )
 
 // Load gets the config from the first successful getter.Get()
-// then it unmarshals the returned bytes using the first successful
+// then unmarshals it using the first successful
 // unmarshaller.Unmarshal
 func (o *ConfigLoader) Load(v any) error {
 	var cfgData []byte
@@ -54,7 +60,9 @@ func (o *ConfigLoader) Load(v any) error {
 	return nil
 }
 
-func NewDefaultConfigLoaderFile(configPath string) *ConfigLoader {
+// NewToolsConfigLoaderFile creates a new ConfigLoader with config
+// getters and unmarshalers matching what the Aerospike Tools config files support.
+func NewToolsConfigLoaderFile(configPath string) *ConfigLoader {
 	loader := &ConfigLoader{
 		Getters: []ConfigGetter{
 			&ConfigGetterFile{

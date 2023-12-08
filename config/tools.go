@@ -8,15 +8,33 @@ import (
 	"github.com/spf13/pflag"
 )
 
+// ASTOOLS_CONF_DIR is the default location of the directory
+// holding the Aerospike tools configuration file.
+const ASTOOLS_CONF_DIR = "/etc/aerospike"
+
+// ASTOOLS_CONF_NAME is the default name of the Aerospike
+// Tools configuration file.
+const ASTOOLS_CONF_NAME = "astools.conf"
+
 //go:embed schemas/cluster.json
 var ToolsAerospikeClusterSchema string
 
+// ToolsConfig defines a Config struct for handling
+// Aerospike Tools configuration files.
 type ToolsConfig struct {
+	// Config provides base functionality for loading, refreshing
+	// getting, validating, and other operations on configs.
 	Config
+	// Instance sets the tools config instances that this ToolsConfig
+	// will load.
 	Instance string
+	// Sections sets the tools config sections that this ToolsConfig
+	// will load.
 	Sections []string
 }
 
+// GetConfig returns a map representing the loaded
+// tools config data.
 func (o *ToolsConfig) GetConfig() (map[string]any, error) {
 	err := o.Load()
 	if err != nil {
@@ -26,6 +44,8 @@ func (o *ToolsConfig) GetConfig() (map[string]any, error) {
 	return o.Data, nil
 }
 
+// ValidateConfig validates the loaded tools config data
+// against the passed in JSON schema.
 func (o *ToolsConfig) ValidateConfig(schema string) error {
 	err := o.Load()
 	if err != nil {
@@ -35,6 +55,9 @@ func (o *ToolsConfig) ValidateConfig(schema string) error {
 	return o.Config.ValidateConfig(schema)
 }
 
+// Load loads the tools config data into ToolsConfig.Config.Data.
+// The config data is filtered by tools config instance
+// and config sections if they are defined in the ToolsConfig.
 func (o *ToolsConfig) Load() error {
 	if o.Config.Loaded {
 		return nil
@@ -51,6 +74,8 @@ func (o *ToolsConfig) Load() error {
 	return nil
 }
 
+// filterInstance filters a tools config map deleting any config sections
+// that don't have the _cfgInstance suffix.
 func filterInstance(cfg map[string]any, cfgInstance string) {
 	if cfgInstance == "" {
 		return
@@ -73,6 +98,8 @@ func filterInstance(cfg map[string]any, cfgInstance string) {
 	}
 }
 
+// filterSections filters a tools config map deleting any sections
+// that don't match the passed in sections names.
 func filterSections(cfg map[string]any, sections []string) {
 	if len(sections) == 0 {
 		return
@@ -91,6 +118,9 @@ func filterSections(cfg map[string]any, sections []string) {
 
 }
 
+// SetFlags sets flags in a pflag.FlagSet based on the loaded tools config in ToolsConfig.
+// If sections is not nil or empty, only the matching tools config sections will be used
+// when setting the flags. Otherwise, all loaded sections are used.
 func (o *ToolsConfig) SetFlags(sections []string, flags *pflag.FlagSet) error {
 	cfg, err := o.GetConfig()
 	if err != nil {
@@ -142,6 +172,10 @@ func (o *ToolsConfig) SetFlags(sections []string, flags *pflag.FlagSet) error {
 	return err
 }
 
+// NewToolsConfig returns a ToolsConfig with the passed in ConfigLoader.
+// The returned ToolsConfig is configured to only load the sections and tools config instances
+// that are passed in. If those arguments are nil or empty, all sections and config instances
+// will be loaded.
 func NewToolsConfig(cfgLoader *ConfigLoader, sections []string, cfgInstance string) *ToolsConfig {
 	res := &ToolsConfig{
 		Config:   *NewConfig(cfgLoader),

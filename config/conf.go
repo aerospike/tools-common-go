@@ -8,19 +8,27 @@ import (
 	"github.com/xeipuuv/gojsonschema"
 )
 
-const ASTOOLS_CONF_DIR = "/etc/aerospike"
-const ASTOOLS_CONF_NAME = "astools.conf"
-
+// CFGLoader defines an interface for loading
+// config files.
 type CFGLoader interface {
 	Load(v any) error
 }
 
+// Config is the base definition of a Config file.
+// It contains config Data retrieved and unmarshaled
+// by a CFGLoader.
 type Config struct {
-	Data   map[string]any
+	// Data is unmarshaled config data.
+	Data map[string]any
+	// Loaded signifies whether Data has already been
+	// loaded by Loader. All Config methods check this to
+	// see if Data needs to be re-loaded before use.
 	Loaded bool
+	// Loader retrieves and unmarshals the config data.
 	Loader CFGLoader
 }
 
+// Load loads the config data into the Config.Data.
 func (o *Config) Load() error {
 	if o.Loaded {
 		return nil
@@ -35,10 +43,13 @@ func (o *Config) Load() error {
 	return nil
 }
 
+// Refresh sets Config.Loaded to false, which marks the config data
+// to be reloaded.
 func (o *Config) Refresh() {
 	o.Loaded = false
 }
 
+// GetConfig returns the config data, Config.Data.
 func (o *Config) GetConfig() (map[string]any, error) {
 	err := o.Load()
 	if err != nil {
@@ -48,8 +59,7 @@ func (o *Config) GetConfig() (map[string]any, error) {
 	return o.Data, nil
 }
 
-// ValidateConf loads a astools configuration using
-// cfgLoader then validates it against the passed in json schema.
+// ValidateConf validates the config data against the passed in JSON schema.
 func (o *Config) ValidateConfig(schema string) error {
 	confMap, err := o.GetConfig()
 	if err != nil {
@@ -80,6 +90,7 @@ func (o *Config) ValidateConfig(schema string) error {
 	return nil
 }
 
+// NewConfig returns a new config set with the passed in cfgLoader.
 func NewConfig(cfgLoader *ConfigLoader) *Config {
 	res := &Config{
 		Loader: cfgLoader,
