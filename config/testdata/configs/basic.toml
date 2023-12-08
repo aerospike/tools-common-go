@@ -1,0 +1,8 @@
+[cluster]
+host="localhost:3000"
+port=3000
+tls-enable=false
+user="" # Empty string is for no user.
+
+[other]
+outputmode="table"
