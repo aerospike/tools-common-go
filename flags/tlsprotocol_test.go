@@ -14,12 +14,12 @@ type TLSModeTestSuite struct {
 func (suite *FlagsTestSuite) TestTLSProtocolsFlag() {
 	testCases := []struct {
 		input  string
-		output tlsProtocolsFlag
+		output TLSProtocolsFlag
 		err    bool
 	}{
 		{
 			"",
-			tlsProtocolsFlag{
+			TLSProtocolsFlag{
 				min: VERSION_TLS_DEFAULT_MIN,
 				max: VERSION_TLS_DEFAULT_MAX,
 			},
@@ -27,7 +27,7 @@ func (suite *FlagsTestSuite) TestTLSProtocolsFlag() {
 		},
 		{
 			"all",
-			tlsProtocolsFlag{
+			TLSProtocolsFlag{
 				min: tls.VersionTLS10,
 				max: tls.VersionTLS12,
 			},
@@ -35,7 +35,7 @@ func (suite *FlagsTestSuite) TestTLSProtocolsFlag() {
 		},
 		{
 			"all -TLSv1",
-			tlsProtocolsFlag{
+			TLSProtocolsFlag{
 				min: tls.VersionTLS11,
 				max: tls.VersionTLS12,
 			},
@@ -43,7 +43,7 @@ func (suite *FlagsTestSuite) TestTLSProtocolsFlag() {
 		},
 		{
 			"all -TLSv1.2",
-			tlsProtocolsFlag{
+			TLSProtocolsFlag{
 				min: tls.VersionTLS10,
 				max: tls.VersionTLS11,
 			},
@@ -51,7 +51,7 @@ func (suite *FlagsTestSuite) TestTLSProtocolsFlag() {
 		},
 		{
 			"+TLSv1",
-			tlsProtocolsFlag{
+			TLSProtocolsFlag{
 				min: tls.VersionTLS10,
 				max: tls.VersionTLS10,
 			},
@@ -59,7 +59,7 @@ func (suite *FlagsTestSuite) TestTLSProtocolsFlag() {
 		},
 		{
 			"+TLSv1.1",
-			tlsProtocolsFlag{
+			TLSProtocolsFlag{
 				min: tls.VersionTLS11,
 				max: tls.VersionTLS11,
 			},
@@ -67,7 +67,7 @@ func (suite *FlagsTestSuite) TestTLSProtocolsFlag() {
 		},
 		{
 			"+TLSv1.2",
-			tlsProtocolsFlag{
+			TLSProtocolsFlag{
 				min: tls.VersionTLS12,
 				max: tls.VersionTLS12,
 			},
@@ -75,7 +75,7 @@ func (suite *FlagsTestSuite) TestTLSProtocolsFlag() {
 		},
 		{
 			"all -TLSv1.1",
-			tlsProtocolsFlag{
+			TLSProtocolsFlag{
 				min: tls.VersionTLS12,
 				max: tls.VersionTLS12,
 			},
@@ -85,7 +85,7 @@ func (suite *FlagsTestSuite) TestTLSProtocolsFlag() {
 
 	for _, tc := range testCases {
 		suite.T().Run(tc.input, func(t *testing.T) {
-			var actual tlsProtocolsFlag
+			var actual TLSProtocolsFlag
 			err := actual.Set(tc.input)
 			if tc.err {
 				suite.Error(err)

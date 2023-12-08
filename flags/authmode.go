@@ -7,6 +7,8 @@ import (
 	as "github.com/aerospike/aerospike-client-go/v6"
 )
 
+// AuthModeFlag defines a Cobra compatible flag for the
+// --auth flag.
 type AuthModeFlag as.AuthMode
 
 var authModeMap = map[string]as.AuthMode{

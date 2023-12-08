@@ -7,6 +7,9 @@ import (
 	"github.com/spf13/pflag"
 )
 
+// AerospikeConfig can be used with SetAerospikeConf to
+// get the values from an AerospikeFlags structure into an easier to use state.
+// AerospikeConfig is usually used to configure the Aerospike Go client.
 type AerospikeConfig struct {
 	Seeds                  HostTLSPortSlice
 	User                   string
@@ -27,6 +30,8 @@ func NewDefaultAerospikeConfig() *AerospikeConfig {
 	}
 }
 
+// AerospikeFlags defines the storage backing
+// for Aerospike pflags.FlagSet returned from SetAerospikeFlags.
 type AerospikeFlags struct {
 	Seeds          HostTLSPortSliceFlag
 	DefaultPort    int
@@ -35,7 +40,7 @@ type AerospikeFlags struct {
 	AuthMode       AuthModeFlag
 	TLSEnable      bool
 	TLSName        string
-	TLSProtocols   tlsProtocolsFlag
+	TLSProtocols   TLSProtocolsFlag
 	TLSRootCAFile  CertFlag
 	TLSRootCAPath  CertPathFlag
 	TLSCertFile    CertFlag
@@ -78,6 +83,8 @@ func wrapHelpString(val string) string {
 	return wrapString(val, HELP_MAX_LINE)
 }
 
+// SetAerospikeConf sets the values in aerospikeConf based the values set in flags.
+// This function is useful for using AerospikeFlags to configure the Aerospike Go client.
 func SetAerospikeConf(aerospikeConf *AerospikeConfig, flags *AerospikeFlags) {
 	aerospikeConf.Seeds = flags.Seeds.Seeds
 	aerospikeConf.User = flags.User
@@ -112,6 +119,8 @@ func SetAerospikeConf(aerospikeConf *AerospikeConfig, flags *AerospikeFlags) {
 
 }
 
+// SetAerospikeFlags returns a new pflag.FlagSet with Aerospike flags defined.
+// Values set in the returned FlagSet will be stored in the AerospikeFlags argument.
 func SetAerospikeFlags(af *AerospikeFlags) *pflag.FlagSet {
 	f := &pflag.FlagSet{}
 	f.VarP(&af.Seeds, "host", "h", wrapHelpString("The aerospike host."))

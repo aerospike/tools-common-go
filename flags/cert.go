@@ -4,6 +4,13 @@ import (
 	"strings"
 )
 
+// CertFlag defines a Cobra compatible flag for
+// retrieving cryptographic certificates.
+// This supports various Aerospike certificate configurations.
+// examples include...
+// --tls-cafile
+// --tls-certfile
+// --tls-keyfile
 type CertFlag []byte
 
 func (flag *CertFlag) Set(val string) error {
@@ -35,6 +42,10 @@ func (flag *CertFlag) String() string {
 	return string(*flag)
 }
 
+// CertFlag defines a Cobra compatible flag for
+// flags that resolve to a list of certificates.
+// examples include...
+// --tls-capath
 type CertPathFlag [][]byte
 
 func (slice *CertPathFlag) Set(val string) error {

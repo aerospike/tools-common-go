@@ -1,5 +1,10 @@
 package flags
 
+// PasswordFlag defines a Cobra compatible
+// flag for password related options.
+// examples include
+// --password
+// --tls-keyfile-password
 type PasswordFlag []byte
 
 func (flag *PasswordFlag) Set(val string) error {

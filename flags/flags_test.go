@@ -38,7 +38,7 @@ func (suite *FlagsTestSuite) TestSetAerospikeConf() {
 				TLSKeyFile:     []byte("key"),
 				TLSKeyFilePass: []byte("key-pass"),
 				TLSName:        "tls-name-1",
-				TLSProtocols: tlsProtocolsFlag{
+				TLSProtocols: TLSProtocolsFlag{
 					min: tls.VersionTLS11,
 					max: tls.VersionTLS13,
 				},
@@ -82,7 +82,7 @@ func (suite *FlagsTestSuite) TestSetAerospikeConf() {
 				TLSKeyFile:     []byte("key"),
 				TLSKeyFilePass: []byte("key-pass"),
 				TLSName:        "tls-name-1",
-				TLSProtocols: tlsProtocolsFlag{
+				TLSProtocols: TLSProtocolsFlag{
 					min: tls.VersionTLS11,
 					max: tls.VersionTLS13,
 				},
@@ -120,7 +120,7 @@ func (suite *FlagsTestSuite) TestSetAerospikeConf() {
 				TLSCertFile:    []byte("cert"),
 				TLSKeyFile:     []byte("key"),
 				TLSKeyFilePass: []byte("key-pass"),
-				TLSProtocols: tlsProtocolsFlag{
+				TLSProtocols: TLSProtocolsFlag{
 					min: tls.VersionTLS11,
 					max: tls.VersionTLS13,
 				},
@@ -164,7 +164,7 @@ func (suite *FlagsTestSuite) TestSetAerospikeConf() {
 				TLSKeyFile:     []byte("key"),
 				TLSKeyFilePass: []byte("key-pass"),
 				TLSName:        "not-tls-name",
-				TLSProtocols: tlsProtocolsFlag{
+				TLSProtocols: TLSProtocolsFlag{
 					min: tls.VersionTLS11,
 					max: tls.VersionTLS13,
 				},

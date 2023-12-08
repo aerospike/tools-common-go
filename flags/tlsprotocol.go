@@ -26,19 +26,23 @@ func (p TLSProtocol) String() string {
 	return ""
 }
 
-type tlsProtocolsFlag struct {
+// TLSProtocolsFlag defines a Cobra compatible flag
+// for dealing with tls protocols.
+// Example flags include.
+// --tls--protocols
+type TLSProtocolsFlag struct {
 	min TLSProtocol
 	max TLSProtocol
 }
 
-func NewDefaultTLSProtocolsFlag() tlsProtocolsFlag {
-	return tlsProtocolsFlag{
+func NewDefaultTLSProtocolsFlag() TLSProtocolsFlag {
+	return TLSProtocolsFlag{
 		min: VERSION_TLS_DEFAULT_MIN,
 		max: VERSION_TLS_DEFAULT_MAX,
 	}
 }
 
-func (flag *tlsProtocolsFlag) Set(val string) error {
+func (flag *TLSProtocolsFlag) Set(val string) error {
 	if val == "" {
 		*flag = NewDefaultTLSProtocolsFlag()
 		return nil
@@ -127,11 +131,11 @@ func (flag *tlsProtocolsFlag) Set(val string) error {
 	return nil
 }
 
-func (flag *tlsProtocolsFlag) Type() string {
+func (flag *TLSProtocolsFlag) Type() string {
 	return "\"[[+][-]all] [[+][-]TLSv1] [[+][-]TLSv1.1] [[+][-]TLSv1.2]\""
 }
 
-func (flag *tlsProtocolsFlag) String() string {
+func (flag *TLSProtocolsFlag) String() string {
 	if flag.min == flag.max {
 		return flag.max.String()
 	}

@@ -12,6 +12,10 @@ const (
 	DEFAULT_IPV4 = "127.0.0.1"
 )
 
+// HostTLSPort defines a Cobra compatible flag
+// for <host>:[<tls-name>:]<port> format flags.
+// Example configs include...
+// --host
 type HostTLSPort struct {
 	Host    string
 	TLSName string
