@@ -106,7 +106,7 @@ func Test_Config_ValidateConf(t *testing.T) {
 	}
 
 	type args struct {
-		schema string
+		schemas []string
 	}
 	tests := []struct {
 		name    string
@@ -117,7 +117,7 @@ func Test_Config_ValidateConf(t *testing.T) {
 		{
 			name: "passes validation, toml",
 			args: args{
-				schema: ToolsAerospikeClusterSchema,
+				schemas: []string{ToolsAerospikeClusterSchema},
 			},
 			wantErr: false,
 			config:  NewConfig(fileLoaderTOML),
@@ -125,7 +125,7 @@ func Test_Config_ValidateConf(t *testing.T) {
 		{
 			name: "passes validation, yaml",
 			args: args{
-				schema: ToolsAerospikeClusterSchema,
+				schemas: []string{ToolsAerospikeClusterSchema, ToolsAerospikeClusterSchema},
 			},
 			wantErr: false,
 			config:  NewConfig(fileLoaderYAML),
@@ -133,7 +133,7 @@ func Test_Config_ValidateConf(t *testing.T) {
 		{
 			name: "fails validation, toml",
 			args: args{
-				schema: ToolsAerospikeClusterSchema,
+				schemas: []string{ToolsAerospikeClusterSchema},
 			},
 			wantErr: true,
 			config:  NewConfig(&failsValidationLoader),
@@ -141,7 +141,7 @@ func Test_Config_ValidateConf(t *testing.T) {
 		{
 			name: "fails to load",
 			args: args{
-				schema: ToolsAerospikeClusterSchema,
+				schemas: []string{ToolsAerospikeClusterSchema},
 			},
 			wantErr: true,
 			config:  NewConfig(&failsLoader),
@@ -149,7 +149,7 @@ func Test_Config_ValidateConf(t *testing.T) {
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			if err := tt.config.ValidateConfig(tt.args.schema); (err != nil) != tt.wantErr {
+			if err := tt.config.ValidateConfig(tt.args.schemas); (err != nil) != tt.wantErr {
 				t.Errorf("ValidateConfig() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})

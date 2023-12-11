@@ -46,13 +46,13 @@ func (o *ToolsConfig) GetConfig() (map[string]any, error) {
 
 // ValidateConfig validates the loaded tools config data
 // against the passed in JSON schema.
-func (o *ToolsConfig) ValidateConfig(schema string) error {
+func (o *ToolsConfig) ValidateConfig(schemas []string) error {
 	err := o.Load()
 	if err != nil {
 		return err
 	}
 
-	return o.Config.ValidateConfig(schema)
+	return o.Config.ValidateConfig(schemas)
 }
 
 // Load loads the tools config data into ToolsConfig.Config.Data.

@@ -408,7 +408,7 @@ func TestToolsConfig_ValidateConfig(t *testing.T) {
 		Sections []string
 	}
 	type args struct {
-		schema string
+		schemas []string
 	}
 	tests := []struct {
 		name    string
@@ -422,7 +422,7 @@ func TestToolsConfig_ValidateConfig(t *testing.T) {
 				Config: testConfig,
 			},
 			args: args{
-				schema: ToolsAerospikeClusterSchema,
+				schemas: []string{ToolsAerospikeClusterSchema},
 			},
 			wantErr: false,
 		},
@@ -434,7 +434,7 @@ func TestToolsConfig_ValidateConfig(t *testing.T) {
 				Instance: tt.fields.Instance,
 				Sections: tt.fields.Sections,
 			}
-			if err := o.ValidateConfig(tt.args.schema); (err != nil) != tt.wantErr {
+			if err := o.ValidateConfig(tt.args.schemas); (err != nil) != tt.wantErr {
 				t.Errorf("ToolsConfig.ValidateConfig() error = %v, wantErr %v", err, tt.wantErr)
 			}
 		})

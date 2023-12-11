@@ -55,6 +55,7 @@ func NewDefaultAerospikeFlags() *AerospikeFlags {
 	}
 }
 
+// TODO put this in the top level tools-common-go
 // SetAerospikeConf sets the values in aerospikeConf based on the values set in flags.
 // This function is useful for using AerospikeFlags to configure the Aerospike Go client.
 func SetAerospikeConf(aerospikeConf *AerospikeConfig, flags *AerospikeFlags) {

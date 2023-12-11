@@ -60,7 +60,7 @@ func (o *Config) GetConfig() (map[string]any, error) {
 }
 
 // ValidateConf validates the config data against the passed in JSON schema.
-func (o *Config) ValidateConfig(schema string) error {
+func (o *Config) ValidateConfig(schemas []string) error {
 	confMap, err := o.GetConfig()
 	if err != nil {
 		return fmt.Errorf("unable to get config: %w", err)
@@ -68,23 +68,25 @@ func (o *Config) ValidateConfig(schema string) error {
 
 	jsonBytes, err := json.Marshal(confMap)
 	if err != nil {
-		return fmt.Errorf("unable to marshal map to json: %w", err)
+		return fmt.Errorf("unable to marshal config map to json: %w", err)
 	}
 
-	schemaloader := gojsonschema.NewStringLoader(schema)
 	confLoader := gojsonschema.NewStringLoader(string(jsonBytes))
 
-	validResult, err := gojsonschema.Validate(schemaloader, confLoader)
-	if err != nil {
-		return fmt.Errorf("unable to validate config schema: %w", err)
-	}
-
-	if !validResult.Valid() {
-		verrs := fmt.Errorf("invalid config file")
-		for _, err := range validResult.Errors() {
-			errors.Join(verrs, fmt.Errorf("- %s", err))
+	for _, schema := range schemas {
+		schemaloader := gojsonschema.NewStringLoader(schema)
+		validResult, err := gojsonschema.Validate(schemaloader, confLoader)
+		if err != nil {
+			return fmt.Errorf("unable to validate config schema: %w", err)
 		}
-		return verrs
+
+		if !validResult.Valid() {
+			verrs := fmt.Errorf("invalid config file")
+			for _, err := range validResult.Errors() {
+				errors.Join(verrs, fmt.Errorf("- %s", err))
+			}
+			return verrs
+		}
 	}
 
 	return nil
