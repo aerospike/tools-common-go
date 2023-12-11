@@ -1,8 +1,6 @@
 package flags
 
 import (
-	"strings"
-
 	as "github.com/aerospike/aerospike-client-go/v6"
 	"github.com/spf13/pflag"
 )
@@ -57,33 +55,7 @@ func NewDefaultAerospikeFlags() *AerospikeFlags {
 	}
 }
 
-const HELP_MAX_LINE = 65
-
-func wrapString(val string, lineLen int) string {
-	tokens := strings.Split(val, " ")
-	currentLen := 0
-
-	for i, tok := range tokens {
-		if currentLen+len(tok) > lineLen {
-			if i != 0 {
-				tok = "\n" + tok
-			}
-			tokens[i] = tok
-			currentLen = 0
-			continue
-		}
-
-		currentLen += len(tok) + 1 //'\n'
-	}
-
-	return strings.Join(tokens, " ")
-}
-
-func wrapHelpString(val string) string {
-	return wrapString(val, HELP_MAX_LINE)
-}
-
-// SetAerospikeConf sets the values in aerospikeConf based the values set in flags.
+// SetAerospikeConf sets the values in aerospikeConf based on the values set in flags.
 // This function is useful for using AerospikeFlags to configure the Aerospike Go client.
 func SetAerospikeConf(aerospikeConf *AerospikeConfig, flags *AerospikeFlags) {
 	aerospikeConf.Seeds = flags.Seeds.Seeds
@@ -119,24 +91,28 @@ func SetAerospikeConf(aerospikeConf *AerospikeConfig, flags *AerospikeFlags) {
 
 }
 
+// UsageFormatter provides a method for modifying the usage text of the
+// flags returned by SetAerospikeFlags.
+type UsageFormatter func(string) string
+
 // SetAerospikeFlags returns a new pflag.FlagSet with Aerospike flags defined.
 // Values set in the returned FlagSet will be stored in the AerospikeFlags argument.
-func SetAerospikeFlags(af *AerospikeFlags) *pflag.FlagSet {
+func SetAerospikeFlags(af *AerospikeFlags, fmtUsage UsageFormatter) *pflag.FlagSet {
 	f := &pflag.FlagSet{}
-	f.VarP(&af.Seeds, "host", "h", wrapHelpString("The aerospike host."))
-	f.IntVarP(&af.DefaultPort, "port", "p", 3000, wrapHelpString("The default aerospike port."))
-	f.StringVarP(&af.User, "user", "U", "", wrapHelpString("The aerospike user to use to connect to the aerospike cluster."))
-	f.VarP(&af.Password, "password", "P", wrapHelpString("The aerospike password to use to connect to the aerospike cluster."))
-	f.Var(&af.AuthMode, "auth", wrapHelpString("The authentication mode used by the server. INTERNAL uses standard user/pass. EXTERNAL uses external methods (like LDAP) which are configured on the server. EXTERNAL requires TLS. PKI allows TLS authentication and authorization based on a certificate. No user name needs to be configured."))
-	f.BoolVar(&af.TLSEnable, "tls-enable", false, wrapHelpString("Enable TLS authentication. If false, other tls options are ignored."))
-	f.StringVar(&af.TLSName, "tls-name", "", wrapHelpString("The server TLS context to use to authenticate the connection."))
-	f.Var(&af.TLSRootCAFile, "tls-cafile", wrapHelpString("The CA for the agent."))
-	f.Var(&af.TLSRootCAPath, "tls-capath", wrapHelpString("A path containing CAs for the agent."))
-	f.Var(&af.TLSCertFile, "tls-certfile", wrapHelpString("The certificate file of the agent for mutual TLS authentication."))
-	f.Var(&af.TLSKeyFile, "tls-keyfile", wrapHelpString("The key file of the agent for mutual TLS authentication."))
-	f.Var(&af.TLSKeyFilePass, "tls-keyfile-password", wrapHelpString("The password used to decrypt the key-file if encrypted."))
-	f.Var(&af.TLSProtocols, "tls-protocols", wrapHelpString("Set the TLS protocol selection criteria. This format is the same as Apache's SSLProtocol documented at https://httpd.apache.org/docs/current/mod/mod_ssl.html#ssl protocol."))
-	// cmd.PersistentFlags().Var(&aerospikeFlags.tlsCipherSuites, "tls-cipher-suites", wrapHelpString("Set the TLS protocol selection criteria. This format is the same as Apache's SSLProtocol documented at https://httpd.apache.org/docs/current/mod/mod_ssl.html#ssl protocol."))
+	f.VarP(&af.Seeds, "host", "h", fmtUsage("The Aerospike host."))
+	f.IntVarP(&af.DefaultPort, "port", "p", 3000, fmtUsage("The default Aerospike port."))
+	f.StringVarP(&af.User, "user", "U", "", fmtUsage("The Aerospike user to use to connect to the Aerospike cluster."))
+	f.VarP(&af.Password, "password", "P", fmtUsage("The Aerospike password to use to connect to the Aerospike cluster."))
+	f.Var(&af.AuthMode, "auth", fmtUsage("The authentication mode used by the Aerospike server. INTERNAL uses standard user/pass. EXTERNAL uses external methods (like LDAP) which are configured on the server. EXTERNAL requires TLS. PKI allows TLS authentication and authorization based on a certificate. No user name needs to be configured."))
+	f.BoolVar(&af.TLSEnable, "tls-enable", false, fmtUsage("Enable TLS authentication with Aerospike. If false, other tls options are ignored."))
+	f.StringVar(&af.TLSName, "tls-name", "", fmtUsage("The server TLS context to use to authenticate the connection to Aerospike."))
+	f.Var(&af.TLSRootCAFile, "tls-cafile", fmtUsage("The CA used when connecting to Aerospike."))
+	f.Var(&af.TLSRootCAPath, "tls-capath", fmtUsage("A path containing CAs for connecting to Aerospike."))
+	f.Var(&af.TLSCertFile, "tls-certfile", fmtUsage("The certificate file for mutual TLS authentication with Aerospike."))
+	f.Var(&af.TLSKeyFile, "tls-keyfile", fmtUsage("The key file used for mutual TLS authentication with Aerospike."))
+	f.Var(&af.TLSKeyFilePass, "tls-keyfile-password", fmtUsage("The password used to decrypt the key-file if encrypted."))
+	f.Var(&af.TLSProtocols, "tls-protocols", fmtUsage("Set the TLS protocol selection criteria. This format is the same as Apache's SSLProtocol documented at https://httpd.apache.org/docs/current/mod/mod_ssl.html#ssl protocol."))
+	// cmd.PersistentFlags().Var(&aerospikeFlags.tlsCipherSuites, "tls-cipher-suites", fmtUsage("Set the TLS protocol selection criteria. This format is the same as Apache's SSLProtocol documented at https://httpd.apache.org/docs/current/mod/mod_ssl.html#ssl protocol."))
 
 	return f
 }
