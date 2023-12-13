@@ -12,3 +12,4 @@ coverage:
 .PHONY: clean
 clean:
 	rm coverage.cov
+	
