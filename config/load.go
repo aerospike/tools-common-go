@@ -6,10 +6,16 @@ import (
 	"path/filepath"
 )
 
-// CFGLoader defines an interface for loading
-// config files.
-type CFGLoader interface {
-	Load(v any) error
+// GetterFile defines a config getter that retrieves
+// config data from a file.
+type GetterFile struct {
+	ConfigPath string
+}
+
+// Unmarshaller is an interface for
+// unmarshalling config text into a destination
+type Unmarshaller interface {
+	Unmarshal(data []byte, v any) error
 }
 
 // Loader is a struct used to get

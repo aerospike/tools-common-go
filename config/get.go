@@ -8,12 +8,6 @@ type Getter interface {
 	GetConfig() ([]byte, error)
 }
 
-// GetterFile defines a config getter that retrieves
-// config data from a file.
-type GetterFile struct {
-	ConfigPath string
-}
-
 // NewGetterFile returns a new GetterFile
 // using the passed config file path
 func NewGetterFile(configPath string) *GetterFile {

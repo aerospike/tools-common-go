@@ -5,12 +5,6 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// Unmarshaller is an interface for
-// unmarshalling config text into a destination
-type Unmarshaller interface {
-	Unmarshal(data []byte, v any) error
-}
-
 // UnmarshallerTOML defines a config Unmarshaller for TOML.
 type UnmarshallerTOML struct{}
 

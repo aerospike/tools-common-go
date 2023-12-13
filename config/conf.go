@@ -8,6 +8,12 @@ import (
 	"github.com/xeipuuv/gojsonschema"
 )
 
+// CFGLoader defines an interface for loading
+// config files.
+type CFGLoader interface {
+	Load(v any) error
+}
+
 // Config is the base definition of a Config file.
 // It contains config Data retrieved and unmarshaled
 // by a CFGLoader.
