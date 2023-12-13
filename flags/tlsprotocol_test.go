@@ -20,8 +20,8 @@ func (suite *FlagsTestSuite) TestTLSProtocolsFlag() {
 		{
 			"",
 			TLSProtocolsFlag{
-				min: VERSION_TLS_DEFAULT_MIN,
-				max: VERSION_TLS_DEFAULT_MAX,
+				min: VersionTLSDefaultMin,
+				max: VersionTLSDefaultMax,
 			},
 			false,
 		},

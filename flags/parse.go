@@ -45,27 +45,45 @@ func fromFile(v string) (string, error) {
 
 func flagFormatParser(val string, mode flagFormat) (string, error) {
 	split := strings.SplitN(val, ":", 2)
-	sourceType := split[0]
 
 	if len(split) < 2 {
 		return "", nil
 	}
 
+	sourceType := split[0]
 	name := split[1]
-	if (mode&flagFormatEnv) != 0 && sourceType == "env" {
-		return fromEnv(name)
-	} else if (mode&flagFormatEnvB64) != 0 && sourceType == "env-b64" {
-		b64Val, err := fromEnv(name)
-		if err != nil {
-			return "", err
+
+	switch sourceType {
+	case "env":
+		if (mode & flagFormatEnv) != 0 {
+			return fromEnv(name)
 		}
 
-		return fromBase64(b64Val)
-	} else if (mode&flagFormatB64) != 0 && sourceType == "b64" {
-		return fromBase64(name)
-	} else if (mode&flagFormatFile) != 0 && sourceType == "file" {
-		return fromFile(name)
-	} else {
-		return "", nil
+		return "", fmt.Errorf("\"env:\" prefix not supported")
+	case "env-b64":
+		if (mode & flagFormatEnvB64) != 0 {
+			b64Val, err := fromEnv(name)
+			if err != nil {
+				return "", err
+			}
+
+			return fromBase64(b64Val)
+		}
+
+		return "", fmt.Errorf("\"env-b64:\" prefix not supported")
+	case "b64":
+		if (mode & flagFormatB64) != 0 {
+			return fromBase64(name)
+		}
+
+		return "", fmt.Errorf("\"b64:\" prefix not supported")
+	case "file":
+		if (mode & flagFormatFile) != 0 {
+			return fromFile(name)
+		}
+
+		return "", fmt.Errorf("\"file:\" prefix not supported")
 	}
+
+	return "", nil
 }

@@ -123,14 +123,14 @@ func TestToolsConfig_Load(t *testing.T) {
 			name: "basic positive",
 			fields: fields{
 				Config: Config{
-					Loader: &ConfigLoader{
-						[]ConfigGetter{
+					Loader: &Loader{
+						[]Getter{
 							&mockConfigGetter{
 								data: []byte("hi"),
 								err:  nil,
 							},
 						},
-						[]ConfigUnmarshaller{
+						[]Unmarshaller{
 							&mockConfigUnmarshaller{
 								err: nil,
 							},
@@ -146,14 +146,14 @@ func TestToolsConfig_Load(t *testing.T) {
 			name: "basic negative",
 			fields: fields{
 				Config: Config{
-					Loader: &ConfigLoader{
-						[]ConfigGetter{
+					Loader: &Loader{
+						[]Getter{
 							&mockConfigGetter{
 								data: nil,
 								err:  fmt.Errorf("mock error"),
 							},
 						},
-						[]ConfigUnmarshaller{
+						[]Unmarshaller{
 							&mockConfigUnmarshaller{
 								err: nil,
 							},
@@ -169,14 +169,14 @@ func TestToolsConfig_Load(t *testing.T) {
 			name: "filter instance and sections positive",
 			fields: fields{
 				Config: Config{
-					Loader: &ConfigLoader{
-						[]ConfigGetter{
-							&ConfigGetterBytes{
+					Loader: &Loader{
+						[]Getter{
+							&GetterBytes{
 								ConfigData: []byte(confTOML),
 							},
 						},
-						[]ConfigUnmarshaller{
-							&ConfigUnmarshallerTOML{},
+						[]Unmarshaller{
+							&UnmarshallerTOML{},
 						},
 					},
 				},
@@ -210,14 +210,14 @@ type testToolsFlags struct {
 func TestToolsConfig_SetFlags(t *testing.T) {
 
 	testConfig := Config{
-		Loader: &ConfigLoader{
-			[]ConfigGetter{
-				&ConfigGetterBytes{
+		Loader: &Loader{
+			[]Getter{
+				&GetterBytes{
 					ConfigData: []byte(confTOML),
 				},
 			},
-			[]ConfigUnmarshaller{
-				&ConfigUnmarshallerTOML{},
+			[]Unmarshaller{
+				&UnmarshallerTOML{},
 			},
 		},
 	}
@@ -309,14 +309,14 @@ func TestToolsConfig_SetFlags(t *testing.T) {
 func TestToolsConfig_GetConfig(t *testing.T) {
 
 	testConfig := Config{
-		Loader: &ConfigLoader{
-			[]ConfigGetter{
-				&ConfigGetterBytes{
+		Loader: &Loader{
+			[]Getter{
+				&GetterBytes{
 					ConfigData: []byte(confTOML),
 				},
 			},
-			[]ConfigUnmarshaller{
-				&ConfigUnmarshallerTOML{},
+			[]Unmarshaller{
+				&UnmarshallerTOML{},
 			},
 		},
 	}
@@ -390,14 +390,14 @@ func TestToolsConfig_GetConfig(t *testing.T) {
 
 func TestToolsConfig_ValidateConfig(t *testing.T) {
 	testConfig := Config{
-		Loader: &ConfigLoader{
-			[]ConfigGetter{
-				&ConfigGetterBytes{
+		Loader: &Loader{
+			[]Getter{
+				&GetterBytes{
 					ConfigData: []byte(confTOML),
 				},
 			},
-			[]ConfigUnmarshaller{
-				&ConfigUnmarshallerTOML{},
+			[]Unmarshaller{
+				&UnmarshallerTOML{},
 			},
 		},
 	}

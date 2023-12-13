@@ -8,13 +8,13 @@ import (
 	"github.com/spf13/pflag"
 )
 
-// ASTOOLS_CONF_DIR is the default location of the directory
+// AsToolsConfDir is the default location of the directory
 // holding the Aerospike tools configuration file.
-const ASTOOLS_CONF_DIR = "/etc/aerospike"
+const AsToolsConfDir = "/etc/aerospike"
 
-// ASTOOLS_CONF_NAME is the default name of the Aerospike
+// AsToolsConfName is the default name of the Aerospike
 // Tools configuration file.
-const ASTOOLS_CONF_NAME = "astools.conf"
+const AsToolsConfName = "astools.conf"
 
 //go:embed schemas/cluster.json
 var ToolsAerospikeClusterSchema string
@@ -91,8 +91,8 @@ func filterInstance(cfg map[string]any, cfgInstance string) {
 
 	for section := range cfg {
 		if strings.HasSuffix(section, cfgInstance) {
-			base_section := strings.TrimSuffix(section, cfgInstance)
-			cfg[base_section] = cfg[section]
+			baseSection := strings.TrimSuffix(section, cfgInstance)
+			cfg[baseSection] = cfg[section]
 			delete(cfg, section)
 		}
 	}
@@ -115,7 +115,6 @@ func filterSections(cfg map[string]any, sections []string) {
 			delete(cfg, section)
 		}
 	}
-
 }
 
 // SetFlags sets flags in a pflag.FlagSet based on the loaded tools config in ToolsConfig.
@@ -142,13 +141,14 @@ func (o *ToolsConfig) SetFlags(sections []string, flags *pflag.FlagSet) error {
 		}
 	}
 
-	merged_cfg := map[string]any{}
+	mergedConf := map[string]any{}
+
 	for _, section := range sections {
 		if v, ok := cfg[section]; ok {
 			switch v := v.(type) {
 			case map[string]any:
 				for key, val := range v {
-					merged_cfg[key] = val
+					mergedConf[key] = val
 				}
 			default:
 				continue
@@ -157,7 +157,7 @@ func (o *ToolsConfig) SetFlags(sections []string, flags *pflag.FlagSet) error {
 	}
 
 	flags.VisitAll(func(f *pflag.Flag) {
-		val, ok := merged_cfg[f.Name]
+		val, ok := mergedConf[f.Name]
 		if !ok {
 			return
 		}
@@ -176,7 +176,7 @@ func (o *ToolsConfig) SetFlags(sections []string, flags *pflag.FlagSet) error {
 // The returned ToolsConfig is configured to only load the sections and tools config instances
 // that are passed in. If those arguments are nil or empty, all sections and config instances
 // will be loaded.
-func NewToolsConfig(cfgLoader *ConfigLoader, sections []string, cfgInstance string) *ToolsConfig {
+func NewToolsConfig(cfgLoader *Loader, sections []string, cfgInstance string) *ToolsConfig {
 	res := &ToolsConfig{
 		Config:   *NewConfig(cfgLoader),
 		Instance: cfgInstance,

@@ -67,6 +67,15 @@ func Test_flagFormatParser(t *testing.T) {
 			wantErr: true,
 		},
 		{
+			name: "t2",
+			args: args{
+				val:  "env:EnvVarNotSupported",
+				mode: flagFormatFile,
+			},
+			want:    "",
+			wantErr: true,
+		},
+		{
 			name: "t3",
 			args: args{
 				val:  "env-b64:" + envVarB64,
@@ -94,6 +103,15 @@ func Test_flagFormatParser(t *testing.T) {
 			wantErr: true,
 		},
 		{
+			name: "t5",
+			args: args{
+				val:  "env-b64:Notsupported",
+				mode: flagFormatEnvB64,
+			},
+			want:    "",
+			wantErr: true,
+		},
+		{
 			name: "t6",
 			args: args{
 				val:  "b64:" + envVarB64Val,
@@ -107,6 +125,15 @@ func Test_flagFormatParser(t *testing.T) {
 			args: args{
 				val:  "b64:" + envVarB64BadVal,
 				mode: flagFormatB64,
+			},
+			want:    "",
+			wantErr: true,
+		},
+		{
+			name: "t7",
+			args: args{
+				val:  "b64:B64NotSupported",
+				mode: flagFormatFile,
 			},
 			want:    "",
 			wantErr: true,
@@ -132,11 +159,11 @@ func Test_flagFormatParser(t *testing.T) {
 		{
 			name: "t10",
 			args: args{
-				val:  "file:" + envVar,
+				val:  "file:FileNotSupported",
 				mode: flagFormatEnv,
 			},
 			want:    "",
-			wantErr: false,
+			wantErr: true,
 		},
 		{
 			name: "t11",

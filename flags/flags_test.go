@@ -20,7 +20,7 @@ func (suite *FlagsTestSuite) TestSetAerospikeConf() {
 		{
 			&AerospikeFlags{
 				Seeds: HostTLSPortSliceFlag{
-					default_: false,
+					useDefault: false,
 					Seeds: HostTLSPortSlice{
 						{
 							Host: "2001:0db8:85a3:0000:0000:8a2e:0370:7334",
@@ -65,7 +65,7 @@ func (suite *FlagsTestSuite) TestSetAerospikeConf() {
 		{
 			&AerospikeFlags{
 				Seeds: HostTLSPortSliceFlag{
-					default_: false,
+					useDefault: false,
 					Seeds: HostTLSPortSlice{
 						{
 							Host: "2001:0db8:85a3:0000:0000:8a2e:0370:7334",
@@ -103,7 +103,7 @@ func (suite *FlagsTestSuite) TestSetAerospikeConf() {
 		{
 			&AerospikeFlags{
 				Seeds: HostTLSPortSliceFlag{
-					default_: false,
+					useDefault: false,
 					Seeds: HostTLSPortSlice{
 						{
 							Host: "2001:0db8:85a3:0000:0000:8a2e:0370:7334",
@@ -146,7 +146,7 @@ func (suite *FlagsTestSuite) TestSetAerospikeConf() {
 		{
 			&AerospikeFlags{
 				Seeds: HostTLSPortSliceFlag{
-					default_: false,
+					useDefault: false,
 					Seeds: HostTLSPortSlice{
 						{
 							Host:    "2001:0db8:85a3:0000:0000:8a2e:0370:7334",

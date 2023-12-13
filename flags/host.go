@@ -8,8 +8,8 @@ import (
 )
 
 const (
-	DEFAULT_PORT = 3000
-	DEFAULT_IPV4 = "127.0.0.1"
+	DefaultPort = 3000
+	DefaultIPv4 = "127.0.0.1"
 )
 
 // HostTLSPort defines a Cobra compatible flag
@@ -38,9 +38,9 @@ func (addr *HostTLSPort) String() string {
 
 func NewDefaultHostTLSPort() *HostTLSPort {
 	return &HostTLSPort{
-		DEFAULT_IPV4,
+		DefaultIPv4,
 		"",
-		DEFAULT_PORT,
+		DefaultPort,
 	}
 }
 
@@ -66,18 +66,17 @@ func (slice *HostTLSPortSlice) String() string {
 // input option.  It implements the pflag Value and SliceValue interfaces to
 // enable automatic parsing by cobra.
 type HostTLSPortSliceFlag struct {
-	default_ bool
-	Seeds    HostTLSPortSlice
+	useDefault bool
+	Seeds      HostTLSPortSlice
 }
 
 func NewHostTLSPortSliceFlag() HostTLSPortSliceFlag {
 	return HostTLSPortSliceFlag{
-		default_: true,
+		useDefault: true,
 		Seeds: HostTLSPortSlice{
 			NewDefaultHostTLSPort(),
 		},
 	}
-
 }
 
 func parseHostTLSPort(v string) (*HostTLSPort, error) {
@@ -86,33 +85,35 @@ func parseHostTLSPort(v string) (*HostTLSPort, error) {
 	hostPattern := `^(?P<host>[^:]*)` // matched ipv4 and hostname
 	tlsNamePattern := `(?P<tlsName>.*)`
 	portPattern := `(?P<port>\d+)$`
-	re_ipv6host := regexp.MustCompile(fmt.Sprintf("%s$", ipv6HostPattern))
-	re_ipv6hostport := regexp.MustCompile(fmt.Sprintf("%s:%s", ipv6HostPattern, portPattern))
-	re_ipv6hostnameport := regexp.MustCompile(fmt.Sprintf("%s:%s:%s", ipv6HostPattern, tlsNamePattern, portPattern))
-	re_ipv4host := regexp.MustCompile(fmt.Sprintf("%s$", hostPattern))
-	re_ipv4hostport := regexp.MustCompile(fmt.Sprintf("%s:%s", hostPattern, portPattern))
-	re_ipv4hostnameport := regexp.MustCompile(fmt.Sprintf("%s:%s:%s", hostPattern, tlsNamePattern, portPattern))
+	reIPv6Host := regexp.MustCompile(fmt.Sprintf("%s$", ipv6HostPattern))
+	reIPv6HostPort := regexp.MustCompile(fmt.Sprintf("%s:%s", ipv6HostPattern, portPattern))
+	reIPv6HostnamePort := regexp.MustCompile(fmt.Sprintf("%s:%s:%s", ipv6HostPattern, tlsNamePattern, portPattern))
+	reIPv4Host := regexp.MustCompile(fmt.Sprintf("%s$", hostPattern))
+	reIPv4HostPort := regexp.MustCompile(fmt.Sprintf("%s:%s", hostPattern, portPattern))
+	reIPv4HostnamePort := regexp.MustCompile(fmt.Sprintf("%s:%s:%s", hostPattern, tlsNamePattern, portPattern))
 
 	regexsAndNames := []struct {
 		regex      *regexp.Regexp
 		groupNames []string
 	}{
 		// The order is important since the ipv4 pattern also matches ipv6
-		{re_ipv6hostnameport, re_ipv6hostnameport.SubexpNames()},
-		{re_ipv6hostport, re_ipv6hostport.SubexpNames()},
-		{re_ipv6host, re_ipv6host.SubexpNames()},
-		{re_ipv4hostnameport, re_ipv4hostnameport.SubexpNames()},
-		{re_ipv4hostport, re_ipv4hostport.SubexpNames()},
-		{re_ipv4host, re_ipv4host.SubexpNames()},
+		{reIPv6HostnamePort, reIPv6HostnamePort.SubexpNames()},
+		{reIPv6HostPort, reIPv6HostPort.SubexpNames()},
+		{reIPv6Host, reIPv6Host.SubexpNames()},
+		{reIPv4HostnamePort, reIPv4HostnamePort.SubexpNames()},
+		{reIPv4HostPort, reIPv4HostPort.SubexpNames()},
+		{reIPv4Host, reIPv4Host.SubexpNames()},
 	}
 
 	for _, r := range regexsAndNames {
 		regex := r.regex
 		groupNames := r.groupNames
+
 		if matchs := regex.FindStringSubmatch(v); matchs != nil {
 			for idx, match := range matchs {
-				name := groupNames[idx]
 				var err error
+
+				name := groupNames[idx]
 
 				switch {
 				case name == "host":
@@ -120,11 +121,12 @@ func parseHostTLSPort(v string) (*HostTLSPort, error) {
 				case name == "tlsName":
 					host.TLSName = match
 				case name == "port":
-					var int_ int64
-					int_, err = strconv.ParseInt(match, 0, 0)
+					var intPort int64
+
+					intPort, err = strconv.ParseInt(match, 0, 0)
 
 					if err == nil {
-						host.Port = int(int_)
+						host.Port = int(intPort)
 					}
 				}
 
@@ -132,6 +134,7 @@ func parseHostTLSPort(v string) (*HostTLSPort, error) {
 					return host, fmt.Errorf("failed to parse %s : %s", name, err)
 				}
 			}
+
 			return host, nil
 		}
 	}
@@ -148,6 +151,7 @@ func (slice *HostTLSPortSliceFlag) Append(val string) error {
 	}
 
 	slice.Seeds = append(slice.Seeds, host)
+
 	return nil
 }
 
@@ -178,13 +182,13 @@ func (slice *HostTLSPortSliceFlag) GetSlice() []string {
 func (slice *HostTLSPortSliceFlag) Set(commaSepVal string) error {
 	vals := strings.Split(commaSepVal, ",")
 
-	if slice.default_ {
-		slice.default_ = false
+	if slice.useDefault {
+		slice.useDefault = false
 		return slice.Replace(vals)
 	}
 
 	for _, val := range vals {
-		if err := slice.Append(val); err == nil {
+		if err := slice.Append(val); err != nil {
 			return err
 		}
 	}
@@ -197,9 +201,9 @@ func (slice *HostTLSPortSliceFlag) Type() string {
 }
 
 func (slice *HostTLSPortSliceFlag) String() string {
-	if slice.default_ {
+	if slice.useDefault {
 		// displayed in help
-		return DEFAULT_IPV4
+		return DefaultIPv4
 	}
 
 	return slice.Seeds.String()

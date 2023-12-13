@@ -86,22 +86,22 @@ func Test_Config_ValidateConf(t *testing.T) {
 	basicYAMLPath := filepath.Join(testConfigPath, "basic.yaml")
 	fileLoaderYAML := NewToolsConfigLoaderFile(basicYAMLPath)
 
-	failsLoader := ConfigLoader{
-		Getters: []ConfigGetter{
-			&ConfigGetterFile{
+	failsLoader := Loader{
+		Getters: []Getter{
+			&GetterFile{
 				ConfigPath: "badpath",
 			},
 		},
 	}
 
-	failsValidationLoader := ConfigLoader{
-		Getters: []ConfigGetter{
-			&ConfigGetterBytes{
+	failsValidationLoader := Loader{
+		Getters: []Getter{
+			&GetterBytes{
 				ConfigData: []byte("[cluster]\nhost=1234"),
 			},
 		},
-		Unmarshallers: []ConfigUnmarshaller{
-			&ConfigUnmarshallerTOML{},
+		Unmarshallers: []Unmarshaller{
+			&UnmarshallerTOML{},
 		},
 	}
 

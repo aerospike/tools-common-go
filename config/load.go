@@ -6,23 +6,23 @@ import (
 	"path/filepath"
 )
 
-// ConfigGetter is an interface for getting
+// Getter is an interface for getting
 // config file text
-type ConfigGetter interface {
+type Getter interface {
 	GetConfig() ([]byte, error)
 }
 
-// ConfigUnmarshaller is an interface for
+// Unmarshaller is an interface for
 // unmarshalling config text into a destination
-type ConfigUnmarshaller interface {
+type Unmarshaller interface {
 	Unmarshal(data []byte, v any) error
 }
 
-// ConfigLoader is a struct used to get
+// Loader is a struct used to get
 // and unmarshal config data
-type ConfigLoader struct {
-	Getters       []ConfigGetter
-	Unmarshallers []ConfigUnmarshaller
+type Loader struct {
+	Getters       []Getter
+	Unmarshallers []Unmarshaller
 }
 
 var (
@@ -33,9 +33,11 @@ var (
 // Load gets the config from the first successful getter.Get()
 // then unmarshals it using the first successful
 // unmarshaller.Unmarshal
-func (o *ConfigLoader) Load(v any) error {
-	var cfgData []byte
-	var err error
+func (o *Loader) Load(v any) error {
+	var (
+		cfgData []byte
+		err     error
+	)
 
 	for _, getter := range o.Getters {
 		cfgData, err = getter.GetConfig()
@@ -43,6 +45,7 @@ func (o *ConfigLoader) Load(v any) error {
 			break
 		}
 	}
+
 	if err != nil {
 		return errors.Join(ErrFailedToGetConfig, err)
 	}
@@ -53,6 +56,7 @@ func (o *ConfigLoader) Load(v any) error {
 			break
 		}
 	}
+
 	if err != nil {
 		return errors.Join(ErrFailedToUnmarshalConfig, err)
 	}
@@ -62,23 +66,23 @@ func (o *ConfigLoader) Load(v any) error {
 
 // NewToolsConfigLoaderFile creates a new ConfigLoader with config
 // getters and unmarshalers matching what the Aerospike Tools config files support.
-func NewToolsConfigLoaderFile(configPath string) *ConfigLoader {
-	loader := &ConfigLoader{
-		Getters: []ConfigGetter{
-			&ConfigGetterFile{
+func NewToolsConfigLoaderFile(configPath string) *Loader {
+	loader := &Loader{
+		Getters: []Getter{
+			&GetterFile{
 				ConfigPath: configPath,
 			},
 		},
-		Unmarshallers: []ConfigUnmarshaller{
-			&ConfigUnmarshallerTOML{},
-			&ConfigUnmarshallerYAML{},
+		Unmarshallers: []Unmarshaller{
+			&UnmarshallerTOML{},
+			&UnmarshallerYAML{},
 		},
 	}
 
 	// Add the default tools file getter last. If everything else fails
 	// this will try to load the default astools.conf
-	loader.Getters = append(loader.Getters, &ConfigGetterFile{
-		ConfigPath: filepath.Join(ASTOOLS_CONF_DIR, ASTOOLS_CONF_NAME),
+	loader.Getters = append(loader.Getters, &GetterFile{
+		ConfigPath: filepath.Join(AsToolsConfDir, AsToolsConfName),
 	})
 
 	return loader

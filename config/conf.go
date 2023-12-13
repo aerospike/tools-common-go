@@ -40,6 +40,7 @@ func (o *Config) Load() error {
 	}
 
 	o.Loaded = true
+
 	return nil
 }
 
@@ -76,6 +77,7 @@ func (o *Config) ValidateConfig(schemas []string) error {
 	for _, schema := range schemas {
 		schemaloader := gojsonschema.NewStringLoader(schema)
 		validResult, err := gojsonschema.Validate(schemaloader, confLoader)
+
 		if err != nil {
 			return fmt.Errorf("unable to validate config schema: %w", err)
 		}
@@ -83,8 +85,9 @@ func (o *Config) ValidateConfig(schemas []string) error {
 		if !validResult.Valid() {
 			verrs := fmt.Errorf("invalid config file")
 			for _, err := range validResult.Errors() {
-				errors.Join(verrs, fmt.Errorf("- %s", err))
+				verrs = errors.Join(verrs, fmt.Errorf("- %s", err))
 			}
+
 			return verrs
 		}
 	}
@@ -93,7 +96,7 @@ func (o *Config) ValidateConfig(schemas []string) error {
 }
 
 // NewConfig returns a new config set with the passed in cfgLoader.
-func NewConfig(cfgLoader *ConfigLoader) *Config {
+func NewConfig(cfgLoader *Loader) *Config {
 	res := &Config{
 		Loader: cfgLoader,
 	}

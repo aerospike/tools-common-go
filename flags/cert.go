@@ -31,6 +31,7 @@ func (flag *CertFlag) Set(val string) error {
 	}
 
 	*flag = CertFlag(result)
+
 	return nil
 }
 
@@ -56,6 +57,7 @@ func (slice *CertPathFlag) Set(val string) error {
 	}
 
 	*slice = resultBytes
+
 	return nil
 }
 
@@ -67,6 +69,7 @@ func (slice *CertPathFlag) String() string {
 	if len(*slice) == 0 {
 		return ""
 	}
+
 	strList := []string{}
 
 	for _, certBytes := range *slice {

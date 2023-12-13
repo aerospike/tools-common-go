@@ -1,6 +1,6 @@
 module github.com/aerospike/tools-common-go
 
-go 1.21.4
+go 1.21
 
 require (
 	github.com/aerospike/aerospike-client-go/v6 v6.14.1

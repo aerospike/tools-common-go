@@ -19,6 +19,7 @@ func (flag *PasswordFlag) Set(val string) error {
 	}
 
 	*flag = PasswordFlag(result)
+
 	return nil
 }
 

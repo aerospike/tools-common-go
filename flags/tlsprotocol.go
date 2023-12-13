@@ -7,8 +7,8 @@ import (
 )
 
 const (
-	VERSION_TLS_DEFAULT_MIN = tls.VersionTLS12
-	VERSION_TLS_DEFAULT_MAX = tls.VersionTLS12
+	VersionTLSDefaultMin = tls.VersionTLS12
+	VersionTLSDefaultMax = tls.VersionTLS12
 )
 
 type TLSProtocol uint16
@@ -37,8 +37,8 @@ type TLSProtocolsFlag struct {
 
 func NewDefaultTLSProtocolsFlag() TLSProtocolsFlag {
 	return TLSProtocolsFlag{
-		min: VERSION_TLS_DEFAULT_MIN,
-		max: VERSION_TLS_DEFAULT_MAX,
+		min: VersionTLSDefaultMin,
+		max: VersionTLSDefaultMax,
 	}
 }
 
@@ -47,10 +47,6 @@ func (flag *TLSProtocolsFlag) Set(val string) error {
 		*flag = NewDefaultTLSProtocolsFlag()
 		return nil
 	}
-
-	// // just in case
-	// flag.min = tls.VersionTLS10
-	// flag.max = tls.VersionTLS13
 
 	tlsV1 := uint8(1 << 0)
 	tlsV1_1 := uint8(1 << 1)
@@ -65,8 +61,10 @@ func (flag *TLSProtocolsFlag) Set(val string) error {
 	}
 
 	for _, tok := range tokens {
-		var sign byte
-		var current uint8
+		var (
+			sign    byte
+			current uint8
+		)
 
 		if tok[0] == '+' || tok[0] == '-' {
 			sign = tok[0]
@@ -90,14 +88,16 @@ func (flag *TLSProtocolsFlag) Set(val string) error {
 			return fmt.Errorf("unknown protocol version %s", tok)
 		}
 
-		if sign == '+' {
+		switch sign {
+		case '+':
 			protocols |= current
-		} else if sign == '-' {
+		case '-':
 			protocols &= ^current
-		} else {
+		default:
 			if protocols != 0 {
 				return fmt.Errorf("TLS protocol %s overrides already set parameters. Check if a +/- prefix is missing", tok)
 			}
+
 			protocols = current
 		}
 	}
@@ -105,6 +105,7 @@ func (flag *TLSProtocolsFlag) Set(val string) error {
 	if protocols == tlsAll {
 		flag.min = tls.VersionTLS10
 		flag.max = tls.VersionTLS12
+
 		return nil
 	}
 
