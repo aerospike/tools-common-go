@@ -33,6 +33,20 @@ type ToolsConfig struct {
 	Sections []string
 }
 
+// NewToolsConfig returns a ToolsConfig with the passed in ConfigLoader.
+// The returned ToolsConfig is configured to only load the sections and tools config instances
+// that are passed in. If those arguments are nil or empty, all sections and config instances
+// will be loaded.
+func NewToolsConfig(cfgLoader *Loader, sections []string, cfgInstance string) *ToolsConfig {
+	res := &ToolsConfig{
+		Config:   *NewConfig(cfgLoader),
+		Instance: cfgInstance,
+		Sections: sections,
+	}
+
+	return res
+}
+
 // GetConfig returns a map representing the loaded
 // tools config data.
 func (o *ToolsConfig) GetConfig() (map[string]any, error) {
@@ -170,18 +184,4 @@ func (o *ToolsConfig) SetFlags(sections []string, flags *pflag.FlagSet) error {
 	})
 
 	return err
-}
-
-// NewToolsConfig returns a ToolsConfig with the passed in ConfigLoader.
-// The returned ToolsConfig is configured to only load the sections and tools config instances
-// that are passed in. If those arguments are nil or empty, all sections and config instances
-// will be loaded.
-func NewToolsConfig(cfgLoader *Loader, sections []string, cfgInstance string) *ToolsConfig {
-	res := &ToolsConfig{
-		Config:   *NewConfig(cfgLoader),
-		Instance: cfgInstance,
-		Sections: sections,
-	}
-
-	return res
 }

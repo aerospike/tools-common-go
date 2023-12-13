@@ -6,16 +6,10 @@ import (
 	"path/filepath"
 )
 
-// Getter is an interface for getting
-// config file text
-type Getter interface {
-	GetConfig() ([]byte, error)
-}
-
-// Unmarshaller is an interface for
-// unmarshalling config text into a destination
-type Unmarshaller interface {
-	Unmarshal(data []byte, v any) error
+// CFGLoader defines an interface for loading
+// config files.
+type CFGLoader interface {
+	Load(v any) error
 }
 
 // Loader is a struct used to get
@@ -23,6 +17,39 @@ type Unmarshaller interface {
 type Loader struct {
 	Getters       []Getter
 	Unmarshallers []Unmarshaller
+}
+
+// NewToolsConfigLoaderFile creates a new ConfigLoader with config
+// getters and unmarshalers matching what the Aerospike Tools config files support.
+func NewToolsConfigLoaderFile(configPath string) *Loader {
+	loader := &Loader{
+		Getters: []Getter{
+			&GetterFile{
+				ConfigPath: configPath,
+			},
+		},
+		Unmarshallers: []Unmarshaller{
+			&UnmarshallerTOML{},
+			&UnmarshallerYAML{},
+		},
+	}
+
+	// Add the default tools file getter last. If everything else fails
+	// this will try to load the default astools.conf
+	loader.Getters = append(loader.Getters, &GetterFile{
+		ConfigPath: filepath.Join(AsToolsConfDir, AsToolsConfName),
+	})
+
+	return loader
+}
+
+// NewLoader returns a new Loader using the
+// passed in getters and unmarshallers.
+func NewLoader(getters []Getter, unmarshallers []Unmarshaller) *Loader {
+	return &Loader{
+		Getters:       getters,
+		Unmarshallers: unmarshallers,
+	}
 }
 
 var (
@@ -62,28 +89,4 @@ func (o *Loader) Load(v any) error {
 	}
 
 	return nil
-}
-
-// NewToolsConfigLoaderFile creates a new ConfigLoader with config
-// getters and unmarshalers matching what the Aerospike Tools config files support.
-func NewToolsConfigLoaderFile(configPath string) *Loader {
-	loader := &Loader{
-		Getters: []Getter{
-			&GetterFile{
-				ConfigPath: configPath,
-			},
-		},
-		Unmarshallers: []Unmarshaller{
-			&UnmarshallerTOML{},
-			&UnmarshallerYAML{},
-		},
-	}
-
-	// Add the default tools file getter last. If everything else fails
-	// this will try to load the default astools.conf
-	loader.Getters = append(loader.Getters, &GetterFile{
-		ConfigPath: filepath.Join(AsToolsConfDir, AsToolsConfName),
-	})
-
-	return loader
 }

@@ -5,8 +5,19 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+// Unmarshaller is an interface for
+// unmarshalling config text into a destination
+type Unmarshaller interface {
+	Unmarshal(data []byte, v any) error
+}
+
 // UnmarshallerTOML defines a config Unmarshaller for TOML.
 type UnmarshallerTOML struct{}
+
+// NewUnmarshallerTOML returns a new UnmarshallerTOML
+func NewUnmarshallerTOML() *UnmarshallerTOML {
+	return &UnmarshallerTOML{}
+}
 
 // Unmarshal unmarshals TOML format text into v.
 func (o *UnmarshallerTOML) Unmarshal(data []byte, v any) error {
@@ -20,6 +31,11 @@ func (o *UnmarshallerTOML) Unmarshal(data []byte, v any) error {
 
 // UnmarshallerYAML defines a config Unmarshaller for YAML.
 type UnmarshallerYAML struct{}
+
+// NewUnmarshallerYAML returns a new UnmarshallerYAML
+func NewUnmarshallerYAML() *UnmarshallerYAML {
+	return &UnmarshallerYAML{}
+}
 
 // Unmarshal unmarshals YAML format text into v.
 func (o *UnmarshallerYAML) Unmarshal(data []byte, v any) error {

@@ -2,7 +2,6 @@ package flags
 
 import (
 	"fmt"
-	"io"
 	"os"
 	"strings"
 )
@@ -35,8 +34,7 @@ func fromBase64(v string) (string, error) {
 
 func fromFile(v string) (string, error) {
 	resultBytes, err := readFromFile(v, true)
-	// TODO is the special EOF handling needed?
-	if err != nil && err != io.EOF {
+	if err != nil {
 		return "", err
 	}
 

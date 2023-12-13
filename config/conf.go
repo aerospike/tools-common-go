@@ -8,12 +8,6 @@ import (
 	"github.com/xeipuuv/gojsonschema"
 )
 
-// CFGLoader defines an interface for loading
-// config files.
-type CFGLoader interface {
-	Load(v any) error
-}
-
 // Config is the base definition of a Config file.
 // It contains config Data retrieved and unmarshaled
 // by a CFGLoader.
@@ -26,6 +20,15 @@ type Config struct {
 	Loaded bool
 	// Loader retrieves and unmarshals the config data.
 	Loader CFGLoader
+}
+
+// NewConfig returns a new config set with the passed in cfgLoader.
+func NewConfig(cfgLoader *Loader) *Config {
+	res := &Config{
+		Loader: cfgLoader,
+	}
+
+	return res
 }
 
 // Load loads the config data into the Config.Data.
@@ -93,13 +96,4 @@ func (o *Config) ValidateConfig(schemas []string) error {
 	}
 
 	return nil
-}
-
-// NewConfig returns a new config set with the passed in cfgLoader.
-func NewConfig(cfgLoader *Loader) *Config {
-	res := &Config{
-		Loader: cfgLoader,
-	}
-
-	return res
 }
