@@ -141,12 +141,14 @@ func WrapString(val string, lineLen int) string {
 			if i != 0 {
 				tok = "\n" + tok
 			}
+
 			tokens[i] = tok
 			currentLen = 0
+
 			continue
 		}
 
-		currentLen += len(tok) + 1 //'\n'
+		currentLen += len(tok) + 1 // '\n'
 	}
 
 	return strings.Join(tokens, " ")
