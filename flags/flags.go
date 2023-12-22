@@ -1,8 +1,14 @@
 package flags
 
 import (
+	"strings"
+
 	as "github.com/aerospike/aerospike-client-go/v6"
 	"github.com/spf13/pflag"
+)
+
+const (
+	DefaultMaxLineLength = 65
 )
 
 // AerospikeConfig can be used with SetAerospikeConf to
@@ -124,4 +130,28 @@ func SetAerospikeFlags(af *AerospikeFlags, fmtUsage UsageFormatter) *pflag.FlagS
 	// cmd.PersistentFlags().Var(&aerospikeFlags.tlsCipherSuites, "tls-cipher-suites", fmtUsage("Set the TLS protocol selection criteria. This format is the same as Apache's SSLProtocol documented at https://httpd.apache.org/docs/current/mod/mod_ssl.html#ssl protocol."))
 
 	return f
+}
+
+func WrapString(val string, lineLen int) string {
+	tokens := strings.Split(val, " ")
+	currentLen := 0
+
+	for i, tok := range tokens {
+		if currentLen+len(tok) > lineLen {
+			if i != 0 {
+				tok = "\n" + tok
+			}
+			tokens[i] = tok
+			currentLen = 0
+			continue
+		}
+
+		currentLen += len(tok) + 1 //'\n'
+	}
+
+	return strings.Join(tokens, " ")
+}
+
+func DefaultWrapHelpString(val string) string {
+	return WrapString(val, DefaultMaxLineLength)
 }
