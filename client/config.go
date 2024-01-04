@@ -5,8 +5,14 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
+	"time"
 
 	as "github.com/aerospike/aerospike-client-go/v6"
+)
+
+const (
+	defaultTimeout      = 5 * time.Second
+	defaultTendInterval = 5 * time.Second
 )
 
 type AerospikeConfig struct {
@@ -29,7 +35,42 @@ func NewDefaultAerospikeHostConfig() *AerospikeConfig {
 	}
 }
 
-func (config *AerospikeConfig) NewTLSConfig() (*tls.Config, error) {
+func (config *AerospikeConfig) NewClientPolicy() (*as.ClientPolicy, error) {
+	clientPolicy := as.NewClientPolicy()
+	clientPolicy.User = config.User
+	clientPolicy.Password = config.Password
+	clientPolicy.Timeout = defaultTimeout
+	clientPolicy.AuthMode = config.AuthMode
+	clientPolicy.TendInterval = defaultTendInterval
+
+	tlsConfig, err := config.newTLSConfig()
+
+	if err != nil {
+		return nil, err
+	}
+
+	clientPolicy.TlsConfig = tlsConfig
+
+	return clientPolicy, nil
+}
+
+func (ac *AerospikeConfig) NewHosts() []*as.Host {
+	hosts := []*as.Host{}
+
+	for _, seed := range ac.Seeds {
+		host := as.NewHost(seed.Host, seed.Port)
+
+		if seed.TLSName != "" {
+			host.TLSName = seed.TLSName
+		}
+
+		hosts = append(hosts, host)
+	}
+
+	return hosts
+}
+
+func (config *AerospikeConfig) newTLSConfig() (*tls.Config, error) {
 	if len(config.RootCA) == 0 && len(config.Cert) == 0 && len(config.Key) == 0 {
 		return nil, nil
 	}

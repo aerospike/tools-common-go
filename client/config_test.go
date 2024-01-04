@@ -12,6 +12,8 @@ import (
 	"reflect"
 	"testing"
 	"time"
+
+	as "github.com/aerospike/aerospike-client-go/v6"
 )
 
 var key, _ = rsa.GenerateKey(rand.Reader, 512)
@@ -41,9 +43,68 @@ var certFileBytes = pem.EncodeToMemory(&pem.Block{
 	Bytes: cert,
 })
 
+func TestAerospikeConfig_NewClientPolicy(t *testing.T) {
+	config := &AerospikeConfig{
+		User:     "testUser",
+		Password: "testPassword",
+		AuthMode: as.AuthModeExternal,
+	}
+
+	expectedClientPolicy := as.NewClientPolicy()
+	expectedClientPolicy.User = config.User
+	expectedClientPolicy.Password = config.Password
+	expectedClientPolicy.Timeout = defaultTimeout
+	expectedClientPolicy.AuthMode = config.AuthMode
+	expectedClientPolicy.TendInterval = defaultTendInterval
+	expectedClientPolicy.TlsConfig = nil
+
+	clientPolicy, err := config.NewClientPolicy()
+	if err != nil {
+		t.Errorf("NewClientPolicy() returned an unexpected error: %v", err)
+	}
+
+	if !reflect.DeepEqual(clientPolicy, expectedClientPolicy) {
+		t.Errorf("NewClientPolicy() returned incorrect ClientPolicy, got %v, want %v", clientPolicy, expectedClientPolicy)
+	}
+}
+
+func TestAerospikeConfig_NewHosts(t *testing.T) {
+	ac := &AerospikeConfig{
+		Seeds: HostTLSPortSlice{
+			{
+				Host:    "localhost",
+				Port:    3000,
+				TLSName: "example.com",
+			},
+			{
+				Host: "127.0.0.1",
+				Port: 4000,
+			},
+		},
+	}
+
+	expectedHosts := []*as.Host{
+		{
+			Name:    "localhost",
+			Port:    3000,
+			TLSName: "example.com",
+		},
+		{
+			Name: "127.0.0.1",
+			Port: 4000,
+		},
+	}
+
+	actualHosts := ac.NewHosts()
+
+	if !reflect.DeepEqual(actualHosts, expectedHosts) {
+		t.Errorf("NewHosts() returned incorrect hosts, got %v, want %v", actualHosts, expectedHosts)
+	}
+}
+
 func TestAerospikeConfig_NewTLSConfig(t *testing.T) {
 	emptyConfig := &AerospikeConfig{}
-	nilTLSConfig, _ := emptyConfig.NewTLSConfig()
+	nilTLSConfig, _ := emptyConfig.newTLSConfig()
 	if nilTLSConfig != nil {
 		t.Errorf("NewTLSConfig() should return nil when config is empty")
 	}
@@ -60,7 +121,7 @@ func TestAerospikeConfig_NewTLSConfig(t *testing.T) {
 	expectedServerPool.AppendCertsFromPEM(config.RootCA[0])
 	expectedClientPool, _ := loadServerCertAndKey(config.Cert, config.Key, config.KeyPass)
 
-	tlsConfig, err := config.NewTLSConfig()
+	tlsConfig, err := config.newTLSConfig()
 	if err != nil {
 		t.Errorf("NewTLSConfig() returned an unexpected error: %v", err)
 	}
