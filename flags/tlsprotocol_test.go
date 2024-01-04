@@ -4,6 +4,7 @@ import (
 	"crypto/tls"
 	"testing"
 
+	"github.com/aerospike/tools-common-go/client"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -20,8 +21,8 @@ func (suite *FlagsTestSuite) TestTLSProtocolsFlag() {
 		{
 			"",
 			TLSProtocolsFlag{
-				min: VersionTLSDefaultMin,
-				max: VersionTLSDefaultMax,
+				min: client.VersionTLSDefaultMin,
+				max: client.VersionTLSDefaultMax,
 			},
 			false,
 		},

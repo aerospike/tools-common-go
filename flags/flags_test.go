@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	as "github.com/aerospike/aerospike-client-go/v6"
+	"github.com/aerospike/tools-common-go/client"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -15,13 +16,13 @@ type FlagsTestSuite struct {
 func (suite *FlagsTestSuite) TestSetAerospikeConf() {
 	testCases := []struct {
 		input  *AerospikeFlags
-		output *AerospikeConfig
+		output *client.AerospikeConfig
 	}{
 		{
 			&AerospikeFlags{
 				Seeds: HostTLSPortSliceFlag{
 					useDefault: false,
-					Seeds: HostTLSPortSlice{
+					Seeds: client.HostTLSPortSlice{
 						{
 							Host: "2001:0db8:85a3:0000:0000:8a2e:0370:7334",
 						},
@@ -43,8 +44,8 @@ func (suite *FlagsTestSuite) TestSetAerospikeConf() {
 					max: tls.VersionTLS13,
 				},
 			},
-			&AerospikeConfig{
-				Seeds: HostTLSPortSlice{
+			&client.AerospikeConfig{
+				Seeds: client.HostTLSPortSlice{
 					{
 						Host:    "2001:0db8:85a3:0000:0000:8a2e:0370:7334",
 						TLSName: "tls-name-1",
@@ -66,7 +67,7 @@ func (suite *FlagsTestSuite) TestSetAerospikeConf() {
 			&AerospikeFlags{
 				Seeds: HostTLSPortSliceFlag{
 					useDefault: false,
-					Seeds: HostTLSPortSlice{
+					Seeds: client.HostTLSPortSlice{
 						{
 							Host: "2001:0db8:85a3:0000:0000:8a2e:0370:7334",
 						},
@@ -87,8 +88,8 @@ func (suite *FlagsTestSuite) TestSetAerospikeConf() {
 					max: tls.VersionTLS13,
 				},
 			},
-			&AerospikeConfig{
-				Seeds: HostTLSPortSlice{
+			&client.AerospikeConfig{
+				Seeds: client.HostTLSPortSlice{
 					{
 						Host:    "2001:0db8:85a3:0000:0000:8a2e:0370:7334",
 						TLSName: "tls-name-1",
@@ -104,7 +105,7 @@ func (suite *FlagsTestSuite) TestSetAerospikeConf() {
 			&AerospikeFlags{
 				Seeds: HostTLSPortSliceFlag{
 					useDefault: false,
-					Seeds: HostTLSPortSlice{
+					Seeds: client.HostTLSPortSlice{
 						{
 							Host: "2001:0db8:85a3:0000:0000:8a2e:0370:7334",
 							Port: 3002,
@@ -125,8 +126,8 @@ func (suite *FlagsTestSuite) TestSetAerospikeConf() {
 					max: tls.VersionTLS13,
 				},
 			},
-			&AerospikeConfig{
-				Seeds: HostTLSPortSlice{
+			&client.AerospikeConfig{
+				Seeds: client.HostTLSPortSlice{
 					{
 						Host: "2001:0db8:85a3:0000:0000:8a2e:0370:7334",
 						Port: 3002,
@@ -147,7 +148,7 @@ func (suite *FlagsTestSuite) TestSetAerospikeConf() {
 			&AerospikeFlags{
 				Seeds: HostTLSPortSliceFlag{
 					useDefault: false,
-					Seeds: HostTLSPortSlice{
+					Seeds: client.HostTLSPortSlice{
 						{
 							Host:    "2001:0db8:85a3:0000:0000:8a2e:0370:7334",
 							TLSName: "tls-name",
@@ -169,8 +170,8 @@ func (suite *FlagsTestSuite) TestSetAerospikeConf() {
 					max: tls.VersionTLS13,
 				},
 			},
-			&AerospikeConfig{
-				Seeds: HostTLSPortSlice{
+			&client.AerospikeConfig{
+				Seeds: client.HostTLSPortSlice{
 					{
 						Host:    "2001:0db8:85a3:0000:0000:8a2e:0370:7334",
 						TLSName: "tls-name",
@@ -192,7 +193,7 @@ func (suite *FlagsTestSuite) TestSetAerospikeConf() {
 
 	for _, tc := range testCases {
 		suite.T().Run("", func(t *testing.T) {
-			actual := &AerospikeConfig{}
+			actual := &client.AerospikeConfig{}
 			SetAerospikeConf(actual, tc.input)
 			suite.Equal(tc.output, actual)
 		})
