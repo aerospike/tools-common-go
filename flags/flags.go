@@ -16,7 +16,7 @@ const (
 // get the values from an AerospikeFlags structure into an easier to use state.
 // AerospikeConfig is usually used to configure the Aerospike Go client.
 type AerospikeConfig struct {
-	Seeds                  HostTLSPortSlice
+	Seeds                  client.HostTLSPortSlice
 	User                   string
 	Password               string
 	AuthMode               as.AuthMode
@@ -24,14 +24,14 @@ type AerospikeConfig struct {
 	Cert                   []byte
 	Key                    []byte
 	KeyPass                []byte
-	TLSProtocolsMinVersion TLSProtocol
-	TLSProtocolsMaxVersion TLSProtocol
+	TLSProtocolsMinVersion client.TLSProtocol
+	TLSProtocolsMaxVersion client.TLSProtocol
 	// TLSCipherSuites        []uint16 // TODO
 }
 
 func NewDefaultAerospikeConfig() *AerospikeConfig {
 	return &AerospikeConfig{
-		Seeds: HostTLSPortSlice{NewDefaultHostTLSPort()},
+		Seeds: client.HostTLSPortSlice{client.NewDefaultHostTLSPort()},
 	}
 }
 
