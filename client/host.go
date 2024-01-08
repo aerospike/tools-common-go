@@ -11,8 +11,8 @@ type HostTLSPort struct {
 	Port    int
 }
 
-const DEFAULT_PORT = 3000
-const DEFAULT_IPV4 = "127.0.0.1"
+const DefaultPort = 3000
+const DefaultIPv4 = "127.0.0.1"
 
 func NewHostTLSPort() *HostTLSPort {
 	return &HostTLSPort{}
@@ -20,9 +20,9 @@ func NewHostTLSPort() *HostTLSPort {
 
 func NewDefaultHostTLSPort() *HostTLSPort {
 	return &HostTLSPort{
-		DEFAULT_IPV4,
+		DefaultIPv4,
 		"",
-		DEFAULT_PORT,
+		DefaultPort,
 	}
 }
 

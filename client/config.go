@@ -5,14 +5,8 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
-	"time"
 
 	as "github.com/aerospike/aerospike-client-go/v6"
-)
-
-const (
-	defaultTimeout      = 5 * time.Second
-	defaultTendInterval = 5 * time.Second
 )
 
 type AerospikeConfig struct {
@@ -35,15 +29,13 @@ func NewDefaultAerospikeHostConfig() *AerospikeConfig {
 	}
 }
 
-func (config *AerospikeConfig) NewClientPolicy() (*as.ClientPolicy, error) {
+func (ac *AerospikeConfig) NewClientPolicy() (*as.ClientPolicy, error) {
 	clientPolicy := as.NewClientPolicy()
-	clientPolicy.User = config.User
-	clientPolicy.Password = config.Password
-	clientPolicy.Timeout = defaultTimeout
-	clientPolicy.AuthMode = config.AuthMode
-	clientPolicy.TendInterval = defaultTendInterval
+	clientPolicy.User = ac.User
+	clientPolicy.Password = ac.Password
+	clientPolicy.AuthMode = ac.AuthMode
 
-	tlsConfig, err := config.newTLSConfig()
+	tlsConfig, err := ac.newTLSConfig()
 
 	if err != nil {
 		return nil, err
@@ -70,35 +62,33 @@ func (ac *AerospikeConfig) NewHosts() []*as.Host {
 	return hosts
 }
 
-func (config *AerospikeConfig) newTLSConfig() (*tls.Config, error) {
-	if len(config.RootCA) == 0 && len(config.Cert) == 0 && len(config.Key) == 0 {
+func (ac *AerospikeConfig) newTLSConfig() (*tls.Config, error) {
+	if len(ac.RootCA) == 0 && len(ac.Cert) == 0 && len(ac.Key) == 0 {
 		return nil, nil
 	}
 
-	var clientPool []tls.Certificate
-	var serverPool *x509.CertPool
-	var err error
+	var (
+		clientPool []tls.Certificate
+		serverPool *x509.CertPool
+		err        error
+	)
 
-	serverPool, err = loadCACerts(config.RootCA)
+	serverPool = loadCACerts(ac.RootCA)
 
-	if err != nil {
-		return nil, fmt.Errorf("failed to load CA certificates: `%s`", err)
-	}
-
-	if len(config.Cert) > 0 || len(config.Key) > 0 {
-		clientPool, err = loadServerCertAndKey(config.Cert, config.Key, config.KeyPass)
+	if len(ac.Cert) > 0 || len(ac.Key) > 0 {
+		clientPool, err = loadServerCertAndKey(ac.Cert, ac.Key, ac.KeyPass)
 		if err != nil {
 			return nil, fmt.Errorf("failed to load server certificate and key: `%s`", err)
 		}
 	}
 
-	tlsConfig := &tls.Config{
+	tlsConfig := &tls.Config{ //nolint:gosec // aerospike default tls version is TLSv1.2
 		Certificates:             clientPool,
 		RootCAs:                  serverPool,
 		InsecureSkipVerify:       false,
 		PreferServerCipherSuites: true,
-		MinVersion:               uint16(config.TLSProtocolsMinVersion),
-		MaxVersion:               uint16(config.TLSProtocolsMaxVersion),
+		MinVersion:               uint16(ac.TLSProtocolsMinVersion),
+		MaxVersion:               uint16(ac.TLSProtocolsMaxVersion),
 	}
 
 	return tlsConfig, nil
@@ -106,7 +96,7 @@ func (config *AerospikeConfig) newTLSConfig() (*tls.Config, error) {
 
 // loadCACerts returns CA set of certificates (cert pool)
 // reads CA certificate based on the certConfig and adds it to the pool
-func loadCACerts(certsBytes [][]byte) (*x509.CertPool, error) {
+func loadCACerts(certsBytes [][]byte) *x509.CertPool {
 	certificates, err := x509.SystemCertPool()
 	if certificates == nil || err != nil {
 		certificates = x509.NewCertPool()
@@ -118,7 +108,7 @@ func loadCACerts(certsBytes [][]byte) (*x509.CertPool, error) {
 		}
 	}
 
-	return certificates, nil
+	return certificates
 }
 
 // loadServerCertAndKey reads server certificate and associated key file based on certConfig and keyConfig
@@ -135,9 +125,8 @@ func loadServerCertAndKey(certFileBytes, keyFileBytes, keyPassBytes []byte) ([]t
 	}
 
 	// Check and Decrypt the Key Block using passphrase
-	if x509.IsEncryptedPEMBlock(keyBlock) {
-
-		decryptedDERBytes, err := x509.DecryptPEMBlock(keyBlock, keyPassBytes)
+	if x509.IsEncryptedPEMBlock(keyBlock) { //nolint:staticcheck // This needs to be addressed by aerospike as multiple projects require this functionality
+		decryptedDERBytes, err := x509.DecryptPEMBlock(keyBlock, keyPassBytes) //nolint:staticcheck // This needs to be addressed by aerospike as multiple projects require this functionality
 		if err != nil {
 			return nil, fmt.Errorf("failed to decrypt PEM Block: `%s`", err)
 		}

@@ -53,9 +53,7 @@ func TestAerospikeConfig_NewClientPolicy(t *testing.T) {
 	expectedClientPolicy := as.NewClientPolicy()
 	expectedClientPolicy.User = config.User
 	expectedClientPolicy.Password = config.Password
-	expectedClientPolicy.Timeout = defaultTimeout
 	expectedClientPolicy.AuthMode = config.AuthMode
-	expectedClientPolicy.TendInterval = defaultTendInterval
 	expectedClientPolicy.TlsConfig = nil
 
 	clientPolicy, err := config.NewClientPolicy()
@@ -253,27 +251,22 @@ func TestLoadCACerts(t *testing.T) {
 		name           string
 		certsBytes     [][]byte
 		expectedOutput *x509.CertPool
-		expectedError  error
 	}{
 		{
 			name:           "ValidCerts",
 			certsBytes:     [][]byte{cert1, cert2},
 			expectedOutput: expectedPool,
-			expectedError:  nil,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			actualOutput, actualError := loadCACerts(tc.certsBytes)
+			actualOutput := loadCACerts(tc.certsBytes)
 
 			if !reflect.DeepEqual(actualOutput, tc.expectedOutput) {
 				t.Errorf("loadCACerts() output = %v, want %v", actualOutput, tc.expectedOutput)
 			}
 
-			if !errorsEqual(actualError, tc.expectedError) {
-				t.Errorf("loadCACerts() error = %v, want %v", actualError, tc.expectedError)
-			}
 		})
 	}
 }

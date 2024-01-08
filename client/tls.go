@@ -6,7 +6,7 @@ type TLSProtocol uint16
 
 const (
 	VersionTLSDefaultMin = tls.VersionTLS12
-	VersionTLSDefaultMax = tls.VersionTLS12
+	VersionTLSDefaultMax = tls.VersionTLS13
 )
 
 func (p TLSProtocol) String() string {
