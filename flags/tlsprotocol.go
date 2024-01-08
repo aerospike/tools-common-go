@@ -4,41 +4,23 @@ import (
 	"crypto/tls"
 	"fmt"
 	"strings"
+
+	"github.com/aerospike/tools-common-go/client"
 )
-
-const (
-	VersionTLSDefaultMin = tls.VersionTLS12
-	VersionTLSDefaultMax = tls.VersionTLS12
-)
-
-type TLSProtocol uint16
-
-func (p TLSProtocol) String() string {
-	switch p {
-	case tls.VersionTLS10:
-		return "TLSV1"
-	case tls.VersionTLS11:
-		return "TLSV1.1"
-	case tls.VersionTLS12:
-		return "TLSV1.2"
-	}
-
-	return ""
-}
 
 // TLSProtocolsFlag defines a Cobra compatible flag
 // for dealing with tls protocols.
 // Example flags include.
 // --tls--protocols
 type TLSProtocolsFlag struct {
-	min TLSProtocol
-	max TLSProtocol
+	min client.TLSProtocol
+	max client.TLSProtocol
 }
 
 func NewDefaultTLSProtocolsFlag() TLSProtocolsFlag {
 	return TLSProtocolsFlag{
-		min: VersionTLSDefaultMin,
-		max: VersionTLSDefaultMax,
+		min: client.VersionTLSDefaultMin,
+		max: client.VersionTLSDefaultMax,
 	}
 }
 
@@ -54,7 +36,7 @@ func (flag *TLSProtocolsFlag) Set(val string) error {
 	tlsAll := tlsV1 | tlsV1_1 | tlsV1_2
 	tokens := strings.Fields(val)
 	protocols := uint8(0)
-	protocolSlice := []TLSProtocol{
+	protocolSlice := []client.TLSProtocol{
 		tls.VersionTLS10,
 		tls.VersionTLS11,
 		tls.VersionTLS12,

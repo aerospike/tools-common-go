@@ -5,6 +5,8 @@ import (
 	"regexp"
 	"strconv"
 	"strings"
+
+	"github.com/aerospike/tools-common-go/client"
 )
 
 const (
@@ -12,75 +14,25 @@ const (
 	DefaultIPv4 = "127.0.0.1"
 )
 
-// HostTLSPort defines a Cobra compatible flag
-// for <host>:[<tls-name>:]<port> format flags.
-// Example configs include...
-// --host
-type HostTLSPort struct {
-	Host    string
-	TLSName string
-	Port    int
-}
-
-func (addr *HostTLSPort) String() string {
-	str := addr.Host
-
-	if addr.TLSName != "" {
-		str = fmt.Sprintf("%s:%s", str, addr.TLSName)
-	}
-
-	if addr.Port != 0 {
-		str = fmt.Sprintf("%s:%v", str, addr.Port)
-	}
-
-	return str
-}
-
-func NewDefaultHostTLSPort() *HostTLSPort {
-	return &HostTLSPort{
-		DefaultIPv4,
-		"",
-		DefaultPort,
-	}
-}
-
-type HostTLSPortSlice []*HostTLSPort
-
-func (slice *HostTLSPortSlice) String() string {
-	strs := []string{}
-
-	for _, elem := range *slice {
-		strs = append(strs, elem.String())
-	}
-
-	if len(strs) == 1 {
-		return strs[0]
-	}
-
-	str := fmt.Sprintf("[%s]", strings.Join(strs, ", "))
-
-	return str
-}
-
 // A cobra PFlag to parse and display help info for the host[:tls-name][:port]
 // input option.  It implements the pflag Value and SliceValue interfaces to
 // enable automatic parsing by cobra.
 type HostTLSPortSliceFlag struct {
 	useDefault bool
-	Seeds      HostTLSPortSlice
+	Seeds      client.HostTLSPortSlice
 }
 
 func NewHostTLSPortSliceFlag() HostTLSPortSliceFlag {
 	return HostTLSPortSliceFlag{
 		useDefault: true,
-		Seeds: HostTLSPortSlice{
-			NewDefaultHostTLSPort(),
+		Seeds: client.HostTLSPortSlice{
+			client.NewDefaultHostTLSPort(),
 		},
 	}
 }
 
-func parseHostTLSPort(v string) (*HostTLSPort, error) {
-	host := &HostTLSPort{}
+func parseHostTLSPort(v string) (*client.HostTLSPort, error) {
+	host := &client.HostTLSPort{}
 	ipv6HostPattern := `^\[(?P<host>.*)\]`
 	hostPattern := `^(?P<host>[^:]*)` // matched ipv4 and hostname
 	tlsNamePattern := `(?P<tlsName>.*)`
@@ -157,7 +109,7 @@ func (slice *HostTLSPortSliceFlag) Append(val string) error {
 
 // Replace will fully overwrite any data currently in the flag value list.
 func (slice *HostTLSPortSliceFlag) Replace(vals []string) error {
-	slice.Seeds = HostTLSPortSlice{}
+	slice.Seeds = client.HostTLSPortSlice{}
 
 	for _, val := range vals {
 		if err := slice.Append(val); err != nil {
