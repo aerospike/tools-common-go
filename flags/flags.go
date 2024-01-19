@@ -12,29 +12,6 @@ const (
 	DefaultMaxLineLength = 65
 )
 
-// AerospikeConfig can be used with SetAerospikeConf to
-// get the values from an AerospikeFlags structure into an easier to use state.
-// AerospikeConfig is usually used to configure the Aerospike Go client.
-type AerospikeConfig struct {
-	Seeds                  client.HostTLSPortSlice
-	User                   string
-	Password               string
-	AuthMode               as.AuthMode
-	RootCA                 [][]byte
-	Cert                   []byte
-	Key                    []byte
-	KeyPass                []byte
-	TLSProtocolsMinVersion client.TLSProtocol
-	TLSProtocolsMaxVersion client.TLSProtocol
-	// TLSCipherSuites        []uint16 // TODO
-}
-
-func NewDefaultAerospikeConfig() *AerospikeConfig {
-	return &AerospikeConfig{
-		Seeds: client.HostTLSPortSlice{client.NewDefaultHostTLSPort()},
-	}
-}
-
 // AerospikeFlags defines the storage backing
 // for Aerospike pflags.FlagSet returned from SetAerospikeFlags.
 type AerospikeFlags struct {

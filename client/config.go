@@ -36,7 +36,6 @@ func (ac *AerospikeConfig) NewClientPolicy() (*as.ClientPolicy, error) {
 	clientPolicy.AuthMode = ac.AuthMode
 
 	tlsConfig, err := ac.newTLSConfig()
-
 	if err != nil {
 		return nil, err
 	}

@@ -17,6 +17,8 @@ func (p TLSProtocol) String() string {
 		return "TLSV1.1"
 	case tls.VersionTLS12:
 		return "TLSV1.2"
+	case tls.VersionTLS13:
+		return "TLSV1.3"
 	}
 
 	return ""
