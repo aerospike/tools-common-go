@@ -29,7 +29,7 @@ func Test_Config_GetConfig(t *testing.T) {
 	basicResYAML := map[string]any{
 		"cluster": map[string]any{
 			"host":       "localhost:3000",
-			"port":       3000,
+			"port":       int64(3000),
 			"tls-enable": false,
 			"user":       "",
 		},
@@ -38,9 +38,6 @@ func Test_Config_GetConfig(t *testing.T) {
 		},
 	}
 
-	type args struct {
-		cfgPath string
-	}
 	tests := []struct {
 		name    string
 		want    any
@@ -50,7 +47,7 @@ func Test_Config_GetConfig(t *testing.T) {
 		{
 			name: "basic toml",
 			config: NewConfig(
-				NewToolsConfigLoaderFile(filepath.Join(testConfigPath, "basic.toml")),
+				NewFileLoader(filepath.Join(testConfigPath, "basic.toml")),
 			),
 			want:    basicResTOML,
 			wantErr: false,
@@ -58,7 +55,7 @@ func Test_Config_GetConfig(t *testing.T) {
 		{
 			name: "basic yaml",
 			config: NewConfig(
-				NewToolsConfigLoaderFile(filepath.Join(testConfigPath, "basic.yaml")),
+				NewFileLoader(filepath.Join(testConfigPath, "basic.yaml")),
 			),
 			want:    basicResYAML,
 			wantErr: false,
@@ -81,10 +78,10 @@ func Test_Config_GetConfig(t *testing.T) {
 func Test_Config_ValidateConf(t *testing.T) {
 
 	basicTOMLPath := filepath.Join(testConfigPath, "basic.toml")
-	fileLoaderTOML := NewToolsConfigLoaderFile(basicTOMLPath)
+	fileLoaderTOML := NewFileLoader(basicTOMLPath)
 
 	basicYAMLPath := filepath.Join(testConfigPath, "basic.yaml")
-	fileLoaderYAML := NewToolsConfigLoaderFile(basicYAMLPath)
+	fileLoaderYAML := NewFileLoader(basicYAMLPath)
 
 	failsLoader := Loader{
 		Getters: []Getter{

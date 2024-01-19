@@ -8,9 +8,9 @@ type Getter interface {
 	GetConfig() ([]byte, error)
 }
 
-// NewGetterFile returns a new GetterFile
+// NewFileGetter returns a new GetterFile
 // using the passed config file path
-func NewGetterFile(configPath string) *GetterFile {
+func NewFileGetter(configPath string) *GetterFile {
 	return &GetterFile{ConfigPath: configPath}
 }
 
@@ -30,9 +30,9 @@ type GetterBytes struct {
 	ConfigData []byte
 }
 
-// NewGetterBytes returns a new GetterBytes
+// NewBytesGetter returns a new GetterBytes
 // using the passed in config data.
-func NewGetterBytes(data []byte) *GetterBytes {
+func NewBytesGetter(data []byte) *GetterBytes {
 	return &GetterBytes{ConfigData: data}
 }
 

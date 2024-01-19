@@ -1,5 +1,11 @@
 package flags
 
+import (
+	"reflect"
+
+	"github.com/mitchellh/mapstructure"
+)
+
 // PasswordFlag defines a Cobra compatible
 // flag for password related options.
 // examples include
@@ -29,4 +35,31 @@ func (flag *PasswordFlag) Type() string {
 
 func (flag *PasswordFlag) String() string {
 	return string(*flag)
+}
+
+func PasswordFlagHookFunc() mapstructure.DecodeHookFuncType {
+	return func(
+		f reflect.Type,
+		t reflect.Type,
+		data interface{},
+	) (interface{}, error) {
+		// Check that the data is string
+		if f.Kind() != reflect.String {
+			return data, nil
+		}
+
+		// Check that the target type is our custom type
+		if t != reflect.TypeOf(PasswordFlag{}) {
+			return data, nil
+		}
+
+		// Return the parsed value
+		flag := NewHostTLSPortSliceFlag()
+
+		if err := flag.Set(data.(string)); err != nil {
+			return data, err
+		}
+
+		return flag, nil
+	}
 }

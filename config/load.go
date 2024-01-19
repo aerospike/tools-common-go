@@ -25,20 +25,20 @@ type Loader struct {
 	Unmarshallers []Unmarshaller
 }
 
-// NewToolsConfigLoaderFile creates a new ConfigLoader with config
+// NewFileLoader creates a new ConfigLoader with config
 // getters and unmarshalers matching what the Aerospike Tools config files support.
-func NewToolsConfigLoaderFile(configPath string) *Loader {
-	loader := &Loader{
-		Getters: []Getter{
+func NewFileLoader(configPath string) *Loader {
+	loader := NewLoader(
+		[]Getter{
 			&GetterFile{
 				ConfigPath: configPath,
 			},
 		},
-		Unmarshallers: []Unmarshaller{
+		[]Unmarshaller{
 			&UnmarshallerTOML{},
 			&UnmarshallerYAML{},
 		},
-	}
+	)
 
 	// Add the default tools file getter last. If everything else fails
 	// this will try to load the default astools.conf
