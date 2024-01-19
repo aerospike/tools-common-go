@@ -77,7 +77,7 @@ func (ac *AerospikeConfig) newTLSConfig() (*tls.Config, error) {
 	if len(ac.Cert) > 0 || len(ac.Key) > 0 {
 		clientPool, err = loadServerCertAndKey(ac.Cert, ac.Key, ac.KeyPass)
 		if err != nil {
-			return nil, fmt.Errorf("failed to load server certificate and key: `%s`", err)
+			return nil, fmt.Errorf("failed to load client authentication certificate and key `%s`", err)
 		}
 	}
 
