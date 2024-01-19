@@ -4,35 +4,13 @@ import (
 	"strings"
 
 	as "github.com/aerospike/aerospike-client-go/v6"
+	"github.com/aerospike/tools-common-go/client"
 	"github.com/spf13/pflag"
 )
 
 const (
 	DefaultMaxLineLength = 65
 )
-
-// AerospikeConfig can be used with SetAerospikeConf to
-// get the values from an AerospikeFlags structure into an easier to use state.
-// AerospikeConfig is usually used to configure the Aerospike Go client.
-type AerospikeConfig struct {
-	Seeds                  HostTLSPortSlice
-	User                   string
-	Password               string
-	AuthMode               as.AuthMode
-	RootCA                 [][]byte
-	Cert                   []byte
-	Key                    []byte
-	KeyPass                []byte
-	TLSProtocolsMinVersion TLSProtocol
-	TLSProtocolsMaxVersion TLSProtocol
-	// TLSCipherSuites        []uint16 // TODO
-}
-
-func NewDefaultAerospikeConfig() *AerospikeConfig {
-	return &AerospikeConfig{
-		Seeds: HostTLSPortSlice{NewDefaultHostTLSPort()},
-	}
-}
 
 // AerospikeFlags defines the storage backing
 // for Aerospike pflags.FlagSet returned from SetAerospikeFlags.
@@ -63,7 +41,7 @@ func NewDefaultAerospikeFlags() *AerospikeFlags {
 
 // SetAerospikeConf sets the values in aerospikeConf based on the values set in flags.
 // This function is useful for using AerospikeFlags to configure the Aerospike Go client.
-func SetAerospikeConf(aerospikeConf *AerospikeConfig, flags *AerospikeFlags) {
+func SetAerospikeConf(aerospikeConf *client.AerospikeConfig, flags *AerospikeFlags) {
 	aerospikeConf.Seeds = flags.Seeds.Seeds
 	aerospikeConf.User = flags.User
 	aerospikeConf.Password = string(flags.Password)
