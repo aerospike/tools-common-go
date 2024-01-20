@@ -54,7 +54,7 @@ func PasswordFlagHookFunc() mapstructure.DecodeHookFuncType {
 		}
 
 		// Return the parsed value
-		flag := NewHostTLSPortSliceFlag()
+		flag := PasswordFlag{}
 
 		if err := flag.Set(data.(string)); err != nil {
 			return data, err

@@ -4,14 +4,13 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/aerospike/tools-common-go/client"
 	"github.com/aerospike/tools-common-go/flags"
 	"github.com/mitchellh/mapstructure"
 	"github.com/spf13/viper"
 )
 
 type Config struct {
-	cluster *client.AerospikeConfig
+	Cluster *flags.AerospikeFlags
 }
 
 // // Indicated that a flag is located in the "cluster" toml context.
@@ -62,11 +61,14 @@ func InitConfig(cfgFile string, instance string, clusterConfig *Config) (string,
 				return strings.EqualFold(mapKey, fieldName)
 			}
 		},
-		viper.DecodeHook(flags.AuthModeFlagHookFunc()),
-		viper.DecodeHook(flags.CertFlagHookFunc()),
-		viper.DecodeHook(flags.HostTLSPortSliceFlagHookFunc()),
-		viper.DecodeHook(flags.PasswordFlagHookFunc()),
-		viper.DecodeHook(flags.TLSProtocolFlagHookFunc()),
+		viper.DecodeHook(
+			mapstructure.ComposeDecodeHookFunc(
+				flags.AuthModeFlagHookFunc(),
+				flags.CertFlagHookFunc(),
+				flags.HostTLSPortSliceFlagHookFunc(),
+				flags.PasswordFlagHookFunc(),
+				flags.TLSProtocolFlagHookFunc()),
+		),
 	}
 
 	if cfgFile != "" {
@@ -92,7 +94,10 @@ func InitConfig(cfgFile string, instance string, clusterConfig *Config) (string,
 		}
 	}
 
-	viper.Unmarshal(clusterConfig, decoderConfigs...)
+	err := viper.Unmarshal(clusterConfig, decoderConfigs...)
+	if err != nil {
+		return "", fmt.Errorf("failed to unmarshal config: %w", err)
+	}
 
 	if configFileUsed == "" {
 		return "", nil

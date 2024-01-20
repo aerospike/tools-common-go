@@ -98,9 +98,14 @@ func CertFlagHookFunc() mapstructure.DecodeHookFuncType {
 			return data, nil
 		}
 
-		// Return the parsed value
+		strData := data.(string)
 		flag := CertFlag{}
 
+		if strData == "" {
+			return flag, nil
+		}
+
+		// Return the parsed value
 		if err := flag.Set(data.(string)); err != nil {
 			return data, err
 		}
