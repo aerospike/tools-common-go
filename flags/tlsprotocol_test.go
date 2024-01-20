@@ -30,7 +30,7 @@ func (suite *FlagsTestSuite) TestTLSProtocolsFlag() {
 			"all",
 			TLSProtocolsFlag{
 				min: tls.VersionTLS10,
-				max: tls.VersionTLS12,
+				max: tls.VersionTLS13,
 			},
 			false,
 		},
@@ -38,7 +38,7 @@ func (suite *FlagsTestSuite) TestTLSProtocolsFlag() {
 			"all -TLSv1",
 			TLSProtocolsFlag{
 				min: tls.VersionTLS11,
-				max: tls.VersionTLS12,
+				max: tls.VersionTLS13,
 			},
 			false,
 		},
@@ -46,7 +46,7 @@ func (suite *FlagsTestSuite) TestTLSProtocolsFlag() {
 			"all -TLSv1.2",
 			TLSProtocolsFlag{
 				min: tls.VersionTLS10,
-				max: tls.VersionTLS11,
+				max: tls.VersionTLS13,
 			},
 			false,
 		},
@@ -75,10 +75,18 @@ func (suite *FlagsTestSuite) TestTLSProtocolsFlag() {
 			false,
 		},
 		{
+			"+TLSv1.3",
+			TLSProtocolsFlag{
+				min: tls.VersionTLS13,
+				max: tls.VersionTLS13,
+			},
+			false,
+		},
+		{
 			"all -TLSv1.1",
 			TLSProtocolsFlag{
 				min: tls.VersionTLS12,
-				max: tls.VersionTLS12,
+				max: tls.VersionTLS13,
 			},
 			true,
 		},
