@@ -39,28 +39,25 @@ type Config struct {
 // }
 
 // initConfig reads in config file and ENV variables if set.
-func InitConfig(cfgFile string, instance string, clusterConfig *Config) (string, error) {
-	decoderConfigs := []viper.DecoderConfigOption{
-		func(dc *mapstructure.DecoderConfig) {
-			dc.MatchName = func(mapKey, fieldName string) bool {
-				if instance == "" {
-					return strings.EqualFold(mapKey, fieldName)
-				}
+func InitConfig(cfgFile string, instance string, clusterConfig *Config, otherConfigs ...any) (string, error) {
+	if instance != "" {
+		for _, key := range viper.AllKeys() {
+			splitKey := strings.Split(key, ".")
 
-				splitMapKey := strings.Split(mapKey, ".")
-
-				if len(splitMapKey) <= 1 {
-					return strings.EqualFold(mapKey, fieldName)
-				}
-
-				topLevel := splitMapKey[0]
-				topLevel += "_" + instance
-				strings.Join(splitMapKey[1:], ".")
-				mapKey = topLevel + "." + mapKey
-
-				return strings.EqualFold(mapKey, fieldName)
+			if len(splitKey) <= 1 {
+				continue
 			}
-		},
+
+			topLevel := splitKey[0]
+			topLevel += "_" + instance
+			splitKey[0] = topLevel
+			newKey := strings.Join(splitKey, ".")
+
+			viper.RegisterAlias(key, newKey)
+		}
+	}
+
+	decoderConfigs := []viper.DecoderConfigOption{
 		viper.DecodeHook(
 			mapstructure.ComposeDecodeHookFunc(
 				flags.AuthModeFlagHookFunc(),
@@ -94,9 +91,13 @@ func InitConfig(cfgFile string, instance string, clusterConfig *Config) (string,
 		}
 	}
 
-	err := viper.Unmarshal(clusterConfig, decoderConfigs...)
-	if err != nil {
-		return "", fmt.Errorf("failed to unmarshal config: %w", err)
+	otherConfigs = append(otherConfigs, clusterConfig)
+
+	for _, cfg := range otherConfigs {
+		err := viper.Unmarshal(cfg, decoderConfigs...)
+		if err != nil {
+			return "", fmt.Errorf("failed to unmarshal config: %w", err)
+		}
 	}
 
 	if configFileUsed == "" {

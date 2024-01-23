@@ -126,14 +126,38 @@ func (flag *TLSProtocolsFlag) Type() string {
 
 func (flag *TLSProtocolsFlag) String() string {
 	if flag.min == flag.max {
-		return flag.max.String()
+		return strings.Replace(flag.max.String(), "V", "v", 1)
 	}
 
 	if flag.min == tls.VersionTLS10 && flag.max == tls.VersionTLS13 {
 		return "all"
 	}
 
-	return flag.min.String() + "," + flag.max.String()
+	protocolSlice := []client.TLSProtocol{
+		tls.VersionTLS10,
+		tls.VersionTLS11,
+		tls.VersionTLS12,
+		tls.VersionTLS13,
+	}
+
+	protocols := []string{}
+	on := false
+
+	for _, p := range protocolSlice {
+		if p == flag.min {
+			on = true
+		}
+
+		if p == flag.max {
+			break
+		}
+
+		if on {
+			protocols = append(protocols, "+"+strings.Replace(p.String(), "V", "v", 1))
+		}
+	}
+
+	return strings.Join(protocols, " ")
 }
 
 func TLSProtocolFlagHookFunc() mapstructure.DecodeHookFuncType {
