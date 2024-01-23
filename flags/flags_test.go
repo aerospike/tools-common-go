@@ -193,8 +193,7 @@ func (suite *FlagsTestSuite) TestSetAerospikeConf() {
 
 	for _, tc := range testCases {
 		suite.T().Run("", func(t *testing.T) {
-			actual := &client.AerospikeConfig{}
-			SetAerospikeConf(actual, tc.input)
+			actual := tc.input.NewAerospikeConfig()
 			suite.Equal(tc.output, actual)
 		})
 

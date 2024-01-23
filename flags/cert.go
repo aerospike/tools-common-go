@@ -1,10 +1,7 @@
 package flags
 
 import (
-	"reflect"
 	"strings"
-
-	"github.com/mitchellh/mapstructure"
 )
 
 // CertFlag defines a Cobra compatible flag for
@@ -80,36 +77,4 @@ func (slice *CertPathFlag) String() string {
 	}
 
 	return "[" + strings.Join(strList, ", ") + "]"
-}
-
-func CertFlagHookFunc() mapstructure.DecodeHookFuncType {
-	return func(
-		f reflect.Type,
-		t reflect.Type,
-		data interface{},
-	) (interface{}, error) {
-		// Check that the data is string
-		if f.Kind() != reflect.String {
-			return data, nil
-		}
-
-		// Check that the target type is our custom type
-		if t != reflect.TypeOf(CertFlag{}) {
-			return data, nil
-		}
-
-		strData := data.(string)
-		flag := CertFlag{}
-
-		if strData == "" {
-			return flag, nil
-		}
-
-		// Return the parsed value
-		if err := flag.Set(data.(string)); err != nil {
-			return data, err
-		}
-
-		return flag, nil
-	}
 }

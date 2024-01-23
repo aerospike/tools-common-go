@@ -154,7 +154,7 @@ func TestNewDefaultAerospikeHostConfig(t *testing.T) {
 		Seeds: HostTLSPortSlice{NewDefaultHostTLSPort()},
 	}
 
-	actualConfig := NewDefaultAerospikeHostConfig()
+	actualConfig := NewDefaultAerospikeConfig()
 
 	if !reflect.DeepEqual(actualConfig, expectedConfig) {
 		t.Errorf("NewDefaultAerospikeHostConfig() = %v, want %v", actualConfig, expectedConfig)

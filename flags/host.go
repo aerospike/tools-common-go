@@ -2,13 +2,11 @@ package flags
 
 import (
 	"fmt"
-	"reflect"
 	"regexp"
 	"strconv"
 	"strings"
 
 	"github.com/aerospike/tools-common-go/client"
-	"github.com/mitchellh/mapstructure"
 )
 
 const (
@@ -30,33 +28,6 @@ func NewHostTLSPortSliceFlag() HostTLSPortSliceFlag {
 		Seeds: client.HostTLSPortSlice{
 			client.NewDefaultHostTLSPort(),
 		},
-	}
-}
-
-func HostTLSPortSliceFlagHookFunc() mapstructure.DecodeHookFuncType {
-	return func(
-		f reflect.Type,
-		t reflect.Type,
-		data interface{},
-	) (interface{}, error) {
-		// Check that the data is string
-		if f.Kind() != reflect.String {
-			return data, nil
-		}
-
-		// Check that the target type is our custom type
-		if t != reflect.TypeOf(HostTLSPortSliceFlag{}) {
-			return data, nil
-		}
-
-		// Return the parsed value
-		flag := NewHostTLSPortSliceFlag()
-
-		if err := flag.Set(data.(string)); err != nil {
-			return data, err
-		}
-
-		return flag, nil
 	}
 }
 

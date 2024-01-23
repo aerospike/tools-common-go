@@ -23,7 +23,7 @@ type AerospikeConfig struct {
 	// TLSCipherSuites        []uint16 // TODO
 }
 
-func NewDefaultAerospikeHostConfig() *AerospikeConfig {
+func NewDefaultAerospikeConfig() *AerospikeConfig {
 	return &AerospikeConfig{
 		Seeds: HostTLSPortSlice{NewDefaultHostTLSPort()},
 	}

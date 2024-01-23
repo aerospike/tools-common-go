@@ -2,11 +2,9 @@ package flags
 
 import (
 	"fmt"
-	"reflect"
 	"strings"
 
 	as "github.com/aerospike/aerospike-client-go/v6"
-	"github.com/mitchellh/mapstructure"
 )
 
 // AuthModeFlag defines a Cobra compatible flag for the
@@ -41,31 +39,4 @@ func (mode *AuthModeFlag) String() string {
 	}
 
 	return ""
-}
-
-func AuthModeFlagHookFunc() mapstructure.DecodeHookFuncType {
-	return func(
-		f reflect.Type,
-		t reflect.Type,
-		data interface{},
-	) (interface{}, error) {
-		// Check that the data is string
-		if f.Kind() != reflect.String {
-			return data, nil
-		}
-
-		// Check that the target type is our custom type
-		if t != reflect.TypeOf(AuthModeFlag(0)) {
-			return data, nil
-		}
-
-		// Return the parsed value
-		flag := AuthModeFlag(as.AuthModeInternal)
-
-		if err := flag.Set(data.(string)); err != nil {
-			return data, err
-		}
-
-		return flag, nil
-	}
 }

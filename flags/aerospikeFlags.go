@@ -29,7 +29,6 @@ type AerospikeFlags struct {
 	TLSCertFile    CertFlag             `mapstructure:"tls-certfile"`
 	TLSKeyFile     CertFlag             `mapstructure:"tls-keyfile"`
 	TLSKeyFilePass PasswordFlag         `mapstructure:"tls-keyfile-password"`
-	// tlsCipherSuites tlsCipherSuitesFlag
 }
 
 func NewDefaultAerospikeFlags() *AerospikeFlags {
@@ -40,48 +39,13 @@ func NewDefaultAerospikeFlags() *AerospikeFlags {
 	}
 }
 
-// SetAerospikeConf sets the values in aerospikeConf based on the values set in flags.
-// This function is useful for using AerospikeFlags to configure the Aerospike Go client.
-func SetAerospikeConf(aerospikeConf *client.AerospikeConfig, flags *AerospikeFlags) {
-	aerospikeConf.Seeds = flags.Seeds.Seeds
-	aerospikeConf.User = flags.User
-	aerospikeConf.Password = string(flags.Password)
-	aerospikeConf.AuthMode = as.AuthMode(flags.AuthMode)
-
-	if flags.TLSEnable {
-		aerospikeConf.Cert = flags.TLSCertFile
-		aerospikeConf.Key = flags.TLSKeyFile
-		aerospikeConf.KeyPass = flags.TLSKeyFilePass
-		aerospikeConf.TLSProtocolsMinVersion = flags.TLSProtocols.min
-		aerospikeConf.TLSProtocolsMaxVersion = flags.TLSProtocols.max
-
-		aerospikeConf.RootCA = [][]byte{}
-
-		if len(flags.TLSRootCAFile) != 0 {
-			aerospikeConf.RootCA = append(aerospikeConf.RootCA, flags.TLSRootCAFile)
-		}
-
-		aerospikeConf.RootCA = append(aerospikeConf.RootCA, flags.TLSRootCAPath...)
-	}
-
-	for _, elem := range aerospikeConf.Seeds {
-		if elem.Port == 0 {
-			elem.Port = flags.DefaultPort
-		}
-
-		if elem.TLSName == "" && flags.TLSName != "" {
-			elem.TLSName = flags.TLSName
-		}
-	}
-}
-
 // UsageFormatter provides a method for modifying the usage text of the
 // flags returned by SetAerospikeFlags.
 type UsageFormatter func(string) string
 
-// SetAerospikeFlags returns a new pflag.FlagSet with Aerospike flags defined.
+// NewAerospikeFlagSet returns a new pflag.FlagSet with Aerospike flags defined.
 // Values set in the returned FlagSet will be stored in the AerospikeFlags argument.
-func SetAerospikeFlags(af *AerospikeFlags, fmtUsage UsageFormatter) *pflag.FlagSet {
+func NewAerospikeFlagSet(af *AerospikeFlags, fmtUsage UsageFormatter) *pflag.FlagSet {
 	f := &pflag.FlagSet{}
 	f.VarP(&af.Seeds, "host", "h", fmtUsage("The Aerospike host."))
 	viper.BindPFlag("cluster.host", f.Lookup("host"))
@@ -122,6 +86,42 @@ func SetAerospikeFlags(af *AerospikeFlags, fmtUsage UsageFormatter) *pflag.FlagS
 	// cmd.PersistentFlags().Var(&aerospikeFlags.tlsCipherSuites, "tls-cipher-suites", fmtUsage("Set the TLS protocol selection criteria. This format is the same as Apache's SSLProtocol documented at https://httpd.apache.org/docs/current/mod/mod_ssl.html#ssl protocol."))
 
 	return f
+}
+
+func (f *AerospikeFlags) NewAerospikeConfig() *client.AerospikeConfig {
+	aerospikeConf := client.NewDefaultAerospikeConfig()
+	aerospikeConf.Seeds = f.Seeds.Seeds
+	aerospikeConf.User = f.User
+	aerospikeConf.Password = string(f.Password)
+	aerospikeConf.AuthMode = as.AuthMode(f.AuthMode)
+
+	if f.TLSEnable {
+		aerospikeConf.Cert = f.TLSCertFile
+		aerospikeConf.Key = f.TLSKeyFile
+		aerospikeConf.KeyPass = f.TLSKeyFilePass
+		aerospikeConf.TLSProtocolsMinVersion = f.TLSProtocols.min
+		aerospikeConf.TLSProtocolsMaxVersion = f.TLSProtocols.max
+
+		aerospikeConf.RootCA = [][]byte{}
+
+		if len(f.TLSRootCAFile) != 0 {
+			aerospikeConf.RootCA = append(aerospikeConf.RootCA, f.TLSRootCAFile)
+		}
+
+		aerospikeConf.RootCA = append(aerospikeConf.RootCA, f.TLSRootCAPath...)
+	}
+
+	for _, elem := range aerospikeConf.Seeds {
+		if elem.Port == 0 {
+			elem.Port = f.DefaultPort
+		}
+
+		if elem.TLSName == "" && f.TLSName != "" {
+			elem.TLSName = f.TLSName
+		}
+	}
+
+	return aerospikeConf
 }
 
 func WrapString(val string, lineLen int) string {

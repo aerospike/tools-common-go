@@ -3,11 +3,9 @@ package flags
 import (
 	"crypto/tls"
 	"fmt"
-	"reflect"
 	"strings"
 
 	"github.com/aerospike/tools-common-go/client"
-	"github.com/mitchellh/mapstructure"
 )
 
 // TLSProtocolsFlag defines a Cobra compatible flag
@@ -158,31 +156,4 @@ func (flag *TLSProtocolsFlag) String() string {
 	}
 
 	return strings.Join(protocols, " ")
-}
-
-func TLSProtocolFlagHookFunc() mapstructure.DecodeHookFuncType {
-	return func(
-		f reflect.Type,
-		t reflect.Type,
-		data interface{},
-	) (interface{}, error) {
-		// Check that the data is string
-		if f.Kind() != reflect.String {
-			return data, nil
-		}
-
-		// Check that the target type is our custom type
-		if t != reflect.TypeOf(TLSProtocolsFlag{}) {
-			return data, nil
-		}
-
-		// Return the parsed value
-		flag := NewDefaultTLSProtocolsFlag()
-
-		if err := flag.Set(data.(string)); err != nil {
-			return data, err
-		}
-
-		return flag, nil
-	}
 }

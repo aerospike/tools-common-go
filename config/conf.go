@@ -1,105 +1,79 @@
 package config
 
 import (
-	"encoding/json"
-	"errors"
 	"fmt"
+	"strings"
 
-	"github.com/xeipuuv/gojsonschema"
+	"github.com/spf13/pflag"
+	"github.com/spf13/viper"
 )
 
-// CFGLoader defines an interface for loading
-// config files.
-type CFGLoader interface {
-	Load(v any) error
-}
+func getAlias(key string, instance string) string {
 
-// Config is the base definition of a Config file.
-// It contains config Data retrieved and unmarshaled
-// by a CFGLoader.
-type Config struct {
-	// Data is unmarshaled config data.
-	Data map[string]any
-	// Loaded signifies whether Data has already been
-	// loaded by Loader. All Config methods check this to
-	// see if Data needs to be re-loaded before use.
-	Loaded bool
-	// Loader retrieves and unmarshals the config data.
-	Loader CFGLoader
-}
-
-// NewConfig returns a new config set with the passed in cfgLoader.
-func NewConfig(cfgLoader *Loader) *Config {
-	res := &Config{
-		Loader: cfgLoader,
+	if instance != "" {
+		instance = "_" + instance
 	}
 
-	return res
+	keySplit := strings.SplitN(key, ".", 2)
+
+	if len(keySplit) == 1 {
+		return key
+	}
+
+	keySplit[0] += instance
+
+	return strings.Join(keySplit, ".")
 }
 
-// Load loads the config data into the Config.Data.
-func (o *Config) Load() error {
-	if o.Loaded {
-		return nil
+// initConfig reads in config file and ENV variables if set.
+func InitConfig(cfgFile string, instance string, flags *pflag.FlagSet) (string, error) {
+	if cfgFile != "" {
+		// Use config file from the flag.
+		viper.SetConfigFile(cfgFile)
+	} else {
+		viper.AddConfigPath(ASTOOLS_CONF_DIR)
+		viper.SetConfigName(ASTOOLS_CONF_NAME)
 	}
 
-	err := o.Loader.Load(&o.Data)
-	if err != nil {
-		return err
+	var configFileUsed string
+
+	// If a config file is found, read it in.
+	if err := viper.ReadInConfig(); err == nil {
+		configFileUsed = viper.ConfigFileUsed()
+	} else {
+		// If .conf then explicitly set type to toml.
+		viper.SetConfigType("toml")
+		if err := viper.ReadInConfig(); err == nil {
+			configFileUsed = viper.ConfigFileUsed()
+		} else if cfgFile != "" {
+			return "", fmt.Errorf("failed to read config file: %w", err)
+		}
 	}
 
-	o.Loaded = true
-
-	return nil
-}
-
-// Refresh sets Config.Loaded to false, which marks the config data
-// to be reloaded.
-func (o *Config) Refresh() {
-	o.Loaded = false
-}
-
-// GetConfig returns the config data, Config.Data.
-func (o *Config) GetConfig() (map[string]any, error) {
-	err := o.Load()
-	if err != nil {
-		return nil, err
+	if configFileUsed == "" {
+		return "", nil
 	}
 
-	return o.Data, nil
-}
+	var persistedErr error
 
-// ValidateConf validates the config data against the passed in JSON schema.
-func (o *Config) ValidateConfig(schemas []string) error {
-	confMap, err := o.GetConfig()
-	if err != nil {
-		return fmt.Errorf("unable to get config: %w", err)
-	}
+	flags.VisitAll(func(f *pflag.Flag) {
+		name := f.Name
+		alias := getAlias(name, instance)
 
-	jsonBytes, err := json.Marshal(confMap)
-	if err != nil {
-		return fmt.Errorf("unable to marshal config map to json: %w", err)
-	}
-
-	confLoader := gojsonschema.NewStringLoader(string(jsonBytes))
-
-	for _, schema := range schemas {
-		schemaloader := gojsonschema.NewStringLoader(schema)
-		validResult, err := gojsonschema.Validate(schemaloader, confLoader)
-
-		if err != nil {
-			return fmt.Errorf("unable to validate config schema: %w", err)
+		if alias != name {
+			viper.RegisterAlias(f.Name, alias)
+			name = alias
 		}
 
-		if !validResult.Valid() {
-			verrs := fmt.Errorf("invalid config file")
-			for _, err := range validResult.Errors() {
-				verrs = errors.Join(verrs, fmt.Errorf("- %s", err))
+		val := viper.GetString(f.Name)
+
+		// Apply the viper config value to the flag when viper has a value
+		if viper.IsSet(f.Name) || viper.IsSet(name) {
+			if err := flags.Set(f.Name, fmt.Sprintf("%v", val)); err != nil {
+				persistedErr = fmt.Errorf("failed to parse flag %s: %s", f.Name, err)
 			}
-
-			return verrs
 		}
-	}
+	})
 
-	return nil
+	return configFileUsed, persistedErr
 }

@@ -1,4 +1,4 @@
-package config2
+package config
 
 const (
 	ASTOOLS_CONF_DIR  = "/etc/aerospike"
