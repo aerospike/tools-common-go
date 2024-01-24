@@ -1,16 +1,10 @@
 package flags
 
 import (
-	"strings"
-
 	as "github.com/aerospike/aerospike-client-go/v6"
 	"github.com/aerospike/tools-common-go/client"
 	"github.com/spf13/pflag"
 	"github.com/spf13/viper"
-)
-
-const (
-	DefaultMaxLineLength = 65
 )
 
 // AerospikeFlags defines the storage backing
@@ -39,13 +33,9 @@ func NewDefaultAerospikeFlags() *AerospikeFlags {
 	}
 }
 
-// UsageFormatter provides a method for modifying the usage text of the
-// flags returned by SetAerospikeFlags.
-type UsageFormatter func(string) string
-
 // NewAerospikeFlagSet returns a new pflag.FlagSet with Aerospike flags defined.
 // Values set in the returned FlagSet will be stored in the AerospikeFlags argument.
-func NewAerospikeFlagSet(af *AerospikeFlags, fmtUsage UsageFormatter) *pflag.FlagSet {
+func (af *AerospikeFlags) NewFlagSet(fmtUsage UsageFormatter) *pflag.FlagSet {
 	f := &pflag.FlagSet{}
 	f.VarP(&af.Seeds, "host", "h", fmtUsage("The Aerospike host."))
 	viper.BindPFlag("cluster.host", f.Lookup("host"))
@@ -122,30 +112,4 @@ func (f *AerospikeFlags) NewAerospikeConfig() *client.AerospikeConfig {
 	}
 
 	return aerospikeConf
-}
-
-func WrapString(val string, lineLen int) string {
-	tokens := strings.Split(val, " ")
-	currentLen := 0
-
-	for i, tok := range tokens {
-		if currentLen+len(tok) > lineLen {
-			if i != 0 {
-				tok = "\n" + tok
-			}
-
-			tokens[i] = tok
-			currentLen = 0
-
-			continue
-		}
-
-		currentLen += len(tok) + 1 // '\n'
-	}
-
-	return strings.Join(tokens, " ")
-}
-
-func DefaultWrapHelpString(val string) string {
-	return WrapString(val, DefaultMaxLineLength)
 }

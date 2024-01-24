@@ -4,7 +4,6 @@ import (
 	"fmt"
 
 	"github.com/spf13/cobra"
-	"github.com/spf13/viper"
 )
 
 // SetupRoot sets up the root command with common flags and options.
@@ -18,7 +17,6 @@ import (
 // Version 1.2.3
 func SetupRoot(rootCmd *cobra.Command, appLongName string) {
 	rootCmd.PersistentFlags().BoolP("help", "u", false, "Display help information")
-	viper.RegisterAlias("help", "usage")
 	rootCmd.SetVersionTemplate(fmt.Sprintf("%s\n{{printf \"Version %%s\" .Version}}\n", appLongName))
-	rootCmd.PersistentFlags().BoolP("version", "V", false, "Version for uda.") // All tools use -V
+	rootCmd.PersistentFlags().BoolP("version", "V", false, "Display version.") // All tools use -V
 }

@@ -2,6 +2,7 @@ package flags
 
 import (
 	"crypto/tls"
+	"os"
 	"testing"
 
 	as "github.com/aerospike/aerospike-client-go/v6"
@@ -9,11 +10,98 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
+var testTmp = "test-tmp"
+
+var passFile = testTmp + "/file_test.txt"
+var passFileTxt = "password-file\n"
+
+var rootCAPath = testTmp + "/root-ca-path/"
+var rootCAFile = testTmp + "/root-ca-path/root-ca.pem"
+var rootCATxt = "root-ca-cert"
+var rootCAFile2 = testTmp + "/root-ca-path/root-ca2.pem"
+var rootCATxt2 = "root-ca-cert2"
+
+var certFile = testTmp + "/cert.pem"
+var certTxt = "cert"
+
+var keyFile = testTmp + "/key.pem"
+var keyTxt = "key"
+
 type FlagsTestSuite struct {
 	suite.Suite
 }
 
-func (suite *FlagsTestSuite) TestSetAerospikeConf() {
+func (suite *FlagsTestSuite) TestNewDefaultAerospikeFlags() {
+	defaultAerospikeFlags := NewDefaultAerospikeFlags()
+
+	suite.Equal(
+		&AerospikeFlags{
+			Seeds:        NewHostTLSPortSliceFlag(),
+			DefaultPort:  3000,
+			TLSProtocols: NewDefaultTLSProtocolsFlag(),
+		},
+		defaultAerospikeFlags,
+	)
+}
+
+func (suite *FlagsTestSuite) TestNewAerospikeFlagSet() {
+	files := []struct {
+		file string
+		txt  string
+	}{
+		{passFile, passFileTxt},
+		{rootCAFile, rootCATxt},
+		{rootCAFile2, rootCATxt2},
+		{certFile, certTxt},
+		{keyFile, keyTxt},
+	}
+
+	os.MkdirAll(rootCAPath, 0777)
+
+	for _, file := range files {
+		err := os.WriteFile(file.file, []byte(file.txt), 0666)
+		suite.NoError(err)
+	}
+
+	defer func() {
+		os.RemoveAll(testTmp)
+	}()
+
+	actualFlags := NewDefaultAerospikeFlags()
+	flagSet := actualFlags.NewFlagSet(func(str string) string { return str })
+
+	expectedSeeds := NewHostTLSPortSliceFlag()
+	expectedSeeds.Set("1.1.1.1:TLS-NAME:3002")
+
+	expectedAuthMode := AuthModeFlag(0)
+	expectedAuthMode.Set("EXTERNAL")
+
+	expectedFlags := &AerospikeFlags{
+		Seeds:       expectedSeeds,
+		DefaultPort: 3001,
+		User:        "admin",
+		Password:    []byte("admin"),
+		AuthMode:    expectedAuthMode,
+		TLSEnable:   true,
+		TLSName:     "tls-name",
+		TLSProtocols: TLSProtocolsFlag{
+			min: tls.VersionTLS13,
+			max: tls.VersionTLS13,
+		},
+		TLSRootCAFile:  []byte(rootCATxt),
+		TLSRootCAPath:  [][]byte{[]byte(rootCATxt), []byte(rootCATxt2)},
+		TLSCertFile:    []byte(certTxt),
+		TLSKeyFile:     []byte(keyTxt),
+		TLSKeyFilePass: []byte("key-pass"),
+	}
+
+	err := flagSet.Parse([]string{"--host", "1.1.1.1:TLS-NAME:3002", "--port", "3001", "--user", "admin", "--password", "admin", "--auth", "EXTERNAL", "--tls-enable", "--tls-name", "tls-name", "--tls-protocols", "-all +TLSv1.3", "--tls-cafile", rootCAFile, "--tls-capath", rootCAPath, "--tls-certfile", certFile, "--tls-keyfile", keyFile, "--tls-keyfile-password", "key-pass"})
+
+	suite.NoError(err)
+	suite.Equal(expectedFlags, actualFlags)
+}
+
+func (suite *FlagsTestSuite) TestNewAerospikeConfig() {
 	testCases := []struct {
 		input  *AerospikeFlags
 		output *client.AerospikeConfig
@@ -200,75 +288,8 @@ func (suite *FlagsTestSuite) TestSetAerospikeConf() {
 	}
 }
 
-func (suite *FlagsTestSuite) TestWrapString() {
-	testCases := []struct {
-		input    string
-		lineLen  int
-		expected string
-	}{
-		{
-			input:    "Lorem ipsum dolor sit amet, consectetur adipiscing elit.",
-			lineLen:  20,
-			expected: "Lorem ipsum dolor\nsit amet,\nconsectetur\nadipiscing elit.",
-		},
-		{
-			input:    "Lorem ipsum dolor sit amet, consectetur adipiscing elit.",
-			lineLen:  30,
-			expected: "Lorem ipsum dolor sit amet,\nconsectetur adipiscing elit.",
-		},
-		{
-			input:    "Lorem ipsum dolor sit amet, consectetur adipiscing elit.",
-			lineLen:  50,
-			expected: "Lorem ipsum dolor sit amet, consectetur adipiscing\nelit.",
-		},
-		{
-			input:    "Lorem ipsum dolor sit amet, consectetur adipiscing elit.",
-			lineLen:  80,
-			expected: "Lorem ipsum dolor sit amet, consectetur adipiscing elit.",
-		},
-		{
-			input:    "Lorem ipsum dolor sit amet, consectetur adipiscing elit.",
-			lineLen:  100,
-			expected: "Lorem ipsum dolor sit amet, consectetur adipiscing elit.",
-		},
-	}
-
-	for _, tc := range testCases {
-		suite.T().Run("", func(t *testing.T) {
-			actual := WrapString(tc.input, tc.lineLen)
-			suite.Equal(t, tc.expected, actual)
-		})
-	}
-}
-
 // In order for 'go test' to run this suite, we need to create
 // a normal test function and pass our suite to suite.Run
 func TestRunFlagsTestSuite(t *testing.T) {
 	suite.Run(t, new(FlagsTestSuite))
-}
-func TestDefaultWrapHelpString(t *testing.T) {
-	testCases := []struct {
-		input    string
-		expected string
-	}{
-		{
-			input:    "Lorem ipsum dolor sit amet, consectetur adipiscing elit.",
-			expected: "Lorem ipsum dolor sit amet, consectetur adipiscing elit.",
-		},
-		{
-			input:    "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam.",
-			expected: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed ut perspiciatis unde\nomnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem\naperiam.",
-		},
-		{
-			input:    "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam. Eaque ipsa quae ab illo inventore veritatis et quasi architecto beatae vitae dicta sunt explicabo.",
-			expected: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed ut perspiciatis unde\nomnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem\naperiam. Eaque ipsa quae ab illo inventore veritatis et quasi architecto beatae vitae\ndicta sunt explicabo.",
-		},
-	}
-
-	for _, tc := range testCases {
-		actual := DefaultWrapHelpString(tc.input)
-		if actual != tc.expected {
-			t.Errorf("Expected: %s, but got: %s", tc.expected, actual)
-		}
-	}
 }
