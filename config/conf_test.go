@@ -1,3 +1,6 @@
+//go:build unit
+// +build unit
+
 package config
 
 import (
@@ -7,7 +10,6 @@ import (
 
 	"github.com/spf13/cobra"
 	"github.com/spf13/pflag"
-	"github.com/spf13/viper"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -54,21 +56,22 @@ type ConfigTestSuite struct {
 }
 
 func (suite *ConfigTestSuite) SetupSuite() {
-	suite.files = []string{wd + "/testdata/configs/basic.conf", wd + "/testdata/configs/basic.yaml"}
+	suite.files = []string{wd + "/test-tmp/basic.conf", wd + "/test-tmp/basic.yaml"}
 
 	os.WriteFile(suite.files[0], []byte(tomlConfigTxt), 0644)
 	os.WriteFile(suite.files[1], []byte(yamlConfigTxt), 0644)
 }
 
-// func (suite *ConfigTestSuite) TearDownSuite() {
-// 	for _, file := range suite.files {
-// 		os.Remove(file)
-// 	}
-// }
+func (suite *ConfigTestSuite) TearDownSuite() {
+	for _, file := range suite.files {
+		os.Remove(file)
+	}
+
+	os.RemoveAll(wd + "/test-tmp")
+}
 
 func (suite *ConfigTestSuite) SetupSubTest() {
-	configToFlagMap = map[string]string{}
-	viper.Reset()
+	Reset()
 }
 
 func (suite *ConfigTestSuite) NewCmds(file, instance string) (*cobra.Command, *cobra.Command, *cobra.Command) {

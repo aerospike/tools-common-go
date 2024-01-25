@@ -88,6 +88,11 @@ func BindPFlags(flags *pflag.FlagSet, section string) {
 	})
 }
 
+func Reset() {
+	configToFlagMap = map[string]string{}
+	viper.Reset()
+}
+
 func getAlias(key string, instance string) string {
 	if instance != "" {
 		instance = "_" + instance
