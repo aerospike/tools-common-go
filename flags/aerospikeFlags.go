@@ -4,7 +4,6 @@ import (
 	as "github.com/aerospike/aerospike-client-go/v6"
 	"github.com/aerospike/tools-common-go/client"
 	"github.com/spf13/pflag"
-	"github.com/spf13/viper"
 )
 
 // AerospikeFlags defines the storage backing
@@ -38,41 +37,28 @@ func NewDefaultAerospikeFlags() *AerospikeFlags {
 func (af *AerospikeFlags) NewFlagSet(fmtUsage UsageFormatter) *pflag.FlagSet {
 	f := &pflag.FlagSet{}
 	f.VarP(&af.Seeds, "host", "h", fmtUsage("The Aerospike host."))
-	viper.BindPFlag("cluster.host", f.Lookup("host"))
 	f.IntVarP(&af.DefaultPort, "port", "p", 3000, fmtUsage("The default Aerospike port."))
-	viper.BindPFlag("cluster.port", f.Lookup("port"))
 	f.StringVarP(&af.User, "user", "U", "", fmtUsage("The Aerospike user to use to connect to the Aerospike cluster."))
-	viper.BindPFlag("cluster.user", f.Lookup("user"))
 	f.VarP(&af.Password, "password", "P", fmtUsage("The Aerospike password to use to connect to the Aerospike cluster."))
-	viper.BindPFlag("cluster.password", f.Lookup("password"))
 	f.Var(&af.AuthMode, "auth", fmtUsage("The authentication mode used by the Aerospike server."+
 		" INTERNAL uses standard user/pass. EXTERNAL uses external methods (like LDAP)"+
 		" which are configured on the server. EXTERNAL requires TLS. PKI allows TLS"+
 		" authentication and authorization based on a certificate. No user name needs to be configured."))
-	viper.BindPFlag("cluster.auth", f.Lookup("auth"))
 	f.BoolVar(&af.TLSEnable, "tls-enable", false, fmtUsage("Enable TLS authentication with Aerospike."+
 		" If false, other tls options are ignored.",
 	))
-	viper.BindPFlag("cluster.tls-enable", f.Lookup("tls-enable"))
 	f.StringVar(&af.TLSName, "tls-name", "", fmtUsage("The server TLS context to use to"+
 		" authenticate the connection to Aerospike.",
 	))
-	viper.BindPFlag("cluster.tls-name", f.Lookup("tls-name"))
 	f.Var(&af.TLSRootCAFile, "tls-cafile", fmtUsage("The CA used when connecting to Aerospike."))
-	viper.BindPFlag("cluster.tls-cafile", f.Lookup("tls-cafile"))
 	f.Var(&af.TLSRootCAPath, "tls-capath", fmtUsage("A path containing CAs for connecting to Aerospike."))
-	viper.BindPFlag("cluster.tls-capath", f.Lookup("tls-capath"))
 	f.Var(&af.TLSCertFile, "tls-certfile", fmtUsage("The certificate file for mutual TLS authentication with Aerospike."))
-	viper.BindPFlag("cluster.tls-certfile", f.Lookup("tls-certfile"))
 	f.Var(&af.TLSKeyFile, "tls-keyfile", fmtUsage("The key file used for mutual TLS authentication with Aerospike."))
-	viper.BindPFlag("cluster.tls-keyfile", f.Lookup("tls-keyfile"))
 	f.Var(&af.TLSKeyFilePass, "tls-keyfile-password", fmtUsage("The password used to decrypt the key-file if encrypted."))
-	viper.BindPFlag("cluster.tls-keyfile-password", f.Lookup("tls-keyfile-password"))
 	f.Var(&af.TLSProtocols, "tls-protocols", fmtUsage(
 		"Set the TLS protocol selection criteria. This format is the same as"+
 			" Apache's SSLProtocol documented at https://httpd.apache.org/docs/current/mod/mod_ssl.html#ssl protocol.",
 	))
-	viper.BindPFlag("cluster.tls-protocols", f.Lookup("tls-protocols"))
 	// cmd.PersistentFlags().Var(&aerospikeFlags.tlsCipherSuites, "tls-cipher-suites", fmtUsage("Set the TLS protocol selection criteria. This format is the same as Apache's SSLProtocol documented at https://httpd.apache.org/docs/current/mod/mod_ssl.html#ssl protocol."))
 
 	return f
