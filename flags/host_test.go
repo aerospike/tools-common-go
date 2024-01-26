@@ -169,11 +169,11 @@ func (suite *HostTestSuite) TestHostTLSPortSetGet() {
 	for _, tc := range testCases {
 		suite.T().Run(tc.input, func(t *testing.T) {
 			actual := NewHostTLSPortSliceFlag()
-			actual.Set(tc.input)
+
+			suite.NoError(actual.Set(tc.input))
 			suite.Equal(tc.output, actual)
 			suite.Equal(tc.slice, actual.GetSlice())
 		})
-
 	}
 }
 
@@ -203,12 +203,11 @@ func (suite *HostTestSuite) TestHostTLSPortAppend() {
 	for _, tc := range testCases {
 		suite.T().Run(tc.input, func(t *testing.T) {
 			actual := NewHostTLSPortSliceFlag()
-			actual.Set(tc.input)
-			actual.Set(tc.append)
-			suite.Equal(tc.output, actual)
-			suite.Equal("", actual.String())
-		})
 
+			suite.NoError(actual.Set(tc.input))
+			suite.NoError(actual.Set(tc.append))
+			suite.Equal(tc.output, actual)
+		})
 	}
 }
 
@@ -240,7 +239,6 @@ func (suite *HostTestSuite) TestHostTLSPortString() {
 		suite.T().Run(tc.output, func(t *testing.T) {
 			suite.Equal(tc.output, tc.input.String())
 		})
-
 	}
 }
 

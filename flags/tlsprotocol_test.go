@@ -103,7 +103,6 @@ func (suite *FlagsTestSuite) TestTLSProtocolsFlag() {
 				suite.Equal(tc.output, actual)
 			}
 		})
-
 	}
 }
 

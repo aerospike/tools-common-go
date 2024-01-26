@@ -46,7 +46,8 @@ func (suite *AuthModeTestSuite) TestAuthModeFlag() {
 	for _, tc := range testCases {
 		suite.T().Run(tc.input, func(t *testing.T) {
 			var actual AuthModeFlag
-			actual.Set(tc.input)
+
+			suite.NoError(actual.Set(tc.input))
 			suite.Equal(actual, tc.output)
 			suite.Equal(actual.String(), strings.ToUpper(tc.input))
 			suite.Equal(actual.Type(), "INTERNAL,EXTERNAL,PKI")

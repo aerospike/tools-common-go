@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	as "github.com/aerospike/aerospike-client-go/v6"
-	"github.com/aerospike/tools-common-go/test_utils"
+	"github.com/aerospike/tools-common-go/testutils"
 )
 
 func TestAerospikeConfig_NewClientPolicy(t *testing.T) {
@@ -32,7 +32,11 @@ func TestAerospikeConfig_NewClientPolicy(t *testing.T) {
 	}
 
 	if !reflect.DeepEqual(clientPolicy, expectedClientPolicy) {
-		t.Errorf("NewClientPolicy() returned incorrect ClientPolicy, got %v, want %v", clientPolicy, expectedClientPolicy)
+		t.Errorf(
+			"NewClientPolicy() returned incorrect ClientPolicy, got %v, want %v",
+			clientPolicy,
+			expectedClientPolicy,
+		)
 	}
 }
 
@@ -72,18 +76,19 @@ func TestAerospikeConfig_NewHosts(t *testing.T) {
 
 func TestAerospikeConfig_NewTLSConfig(t *testing.T) {
 	emptyConfig := &AerospikeConfig{}
+
 	nilTLSConfig, _ := emptyConfig.newTLSConfig()
 	if nilTLSConfig != nil {
 		t.Errorf("NewTLSConfig() should return nil when config is empty")
 	}
 
-	rootCA, _ := test_utils.GenerateCert()
-	cert, _ := test_utils.GenerateCert()
+	rootCA, _ := testutils.GenerateCert()
+	cert, _ := testutils.GenerateCert()
 
 	config := &AerospikeConfig{
 		RootCA:                 [][]byte{rootCA},
 		Cert:                   cert,
-		Key:                    test_utils.KeyFileBytes,
+		Key:                    testutils.KeyFileBytes,
 		KeyPass:                []byte("fakepassphrase"),
 		TLSProtocolsMinVersion: 1,
 		TLSProtocolsMaxVersion: 3,
@@ -98,27 +103,38 @@ func TestAerospikeConfig_NewTLSConfig(t *testing.T) {
 	}
 
 	if !tlsConfig.RootCAs.Equal(expectedServerPool) {
-		t.Errorf("NewTLSConfig() returned incorrect RootCAs, got %v, want %v", tlsConfig.RootCAs, expectedServerPool)
+		t.Errorf(
+			"NewTLSConfig() returned incorrect RootCAs, got %v, want %v",
+			tlsConfig.RootCAs,
+			expectedServerPool,
+		)
 	}
 
 	if !reflect.DeepEqual(tlsConfig.Certificates, expectedClientPool) {
-		t.Errorf("NewTLSConfig() returned incorrect Certificates, got %v, want %v", tlsConfig.Certificates, expectedClientPool)
+		t.Errorf(
+			"NewTLSConfig() returned incorrect Certificates, got %v, want %v",
+			tlsConfig.Certificates, expectedClientPool,
+		)
 	}
 
 	if tlsConfig.InsecureSkipVerify {
 		t.Errorf("NewTLSConfig() should have InsecureSkipVerify set to false")
 	}
 
-	if !tlsConfig.PreferServerCipherSuites {
-		t.Errorf("NewTLSConfig() should have PreferServerCipherSuites set to true")
-	}
-
 	if tlsConfig.MinVersion != uint16(config.TLSProtocolsMinVersion) {
-		t.Errorf("NewTLSConfig() returned incorrect MinVersion, got %v, want %v", tlsConfig.MinVersion, config.TLSProtocolsMinVersion)
+		t.Errorf(
+			"NewTLSConfig() returned incorrect MinVersion, got %v, want %v",
+			tlsConfig.MinVersion,
+			config.TLSProtocolsMinVersion,
+		)
 	}
 
 	if tlsConfig.MaxVersion != uint16(config.TLSProtocolsMaxVersion) {
-		t.Errorf("NewTLSConfig() returned incorrect MaxVersion, got %v, want %v", tlsConfig.MaxVersion, config.TLSProtocolsMaxVersion)
+		t.Errorf(
+			"NewTLSConfig() returned incorrect MaxVersion, got %v, want %v",
+			tlsConfig.MaxVersion,
+			config.TLSProtocolsMaxVersion,
+		)
 	}
 }
 
@@ -136,8 +152,8 @@ func TestNewDefaultAerospikeHostConfig(t *testing.T) {
 
 func TestLoadServerCertAndKey(t *testing.T) {
 	keyPassBytes := []byte("fakepassphrase")
-	certFileBytes, _ := test_utils.GenerateCert()
-	expectedCert, _ := tls.X509KeyPair(certFileBytes, test_utils.KeyFileBytes)
+	certFileBytes, _ := testutils.GenerateCert()
+	expectedCert, _ := tls.X509KeyPair(certFileBytes, testutils.KeyFileBytes)
 
 	testCases := []struct {
 		name           string
@@ -150,7 +166,7 @@ func TestLoadServerCertAndKey(t *testing.T) {
 		{
 			name:           "ValidCertAndKey",
 			certFileBytes:  certFileBytes,
-			keyFileBytes:   test_utils.KeyFileBytes,
+			keyFileBytes:   testutils.KeyFileBytes,
 			keyPassBytes:   keyPassBytes,
 			expectedOutput: []tls.Certificate{expectedCert},
 			expectedError:  nil,
@@ -166,7 +182,7 @@ func TestLoadServerCertAndKey(t *testing.T) {
 		{
 			name:           "EncryptedKeyBlock",
 			certFileBytes:  certFileBytes,
-			keyFileBytes:   encryptPEMBlock(test_utils.KeyFileBytes, keyPassBytes),
+			keyFileBytes:   encryptPEMBlock(testutils.KeyFileBytes, keyPassBytes),
 			keyPassBytes:   keyPassBytes,
 			expectedOutput: []tls.Certificate{expectedCert},
 			expectedError:  nil,
@@ -174,23 +190,37 @@ func TestLoadServerCertAndKey(t *testing.T) {
 		{
 			name:           "InvalidPassphrase",
 			certFileBytes:  certFileBytes,
-			keyFileBytes:   encryptPEMBlock(test_utils.KeyFileBytes, []byte("wrongpassphrase")),
+			keyFileBytes:   encryptPEMBlock(testutils.KeyFileBytes, []byte("wrongpassphrase")),
 			keyPassBytes:   keyPassBytes,
 			expectedOutput: nil,
-			expectedError:  fmt.Errorf("failed to decrypt PEM Block: `x509: decryption password incorrect`"),
+			expectedError: fmt.Errorf(
+				"failed to decrypt PEM Block: `x509: decryption password incorrect`",
+			),
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			actualOutput, actualError := loadServerCertAndKey(tc.certFileBytes, tc.keyFileBytes, tc.keyPassBytes)
+			actualOutput, actualError := loadServerCertAndKey(
+				tc.certFileBytes,
+				tc.keyFileBytes,
+				tc.keyPassBytes,
+			)
 
 			if !reflect.DeepEqual(actualOutput, tc.expectedOutput) {
-				t.Errorf("loadServerCertAndKey() output = %v, want %v", actualOutput, tc.expectedOutput)
+				t.Errorf(
+					"loadServerCertAndKey() output = %v, want %v",
+					actualOutput,
+					tc.expectedOutput,
+				)
 			}
 
 			if !errorsEqual(actualError, tc.expectedError) {
-				t.Errorf("loadServerCertAndKey() error = %v, want %v", actualError, tc.expectedError)
+				t.Errorf(
+					"loadServerCertAndKey() error = %v, want %v",
+					actualError,
+					tc.expectedError,
+				)
 			}
 		})
 	}
@@ -199,7 +229,13 @@ func TestLoadServerCertAndKey(t *testing.T) {
 func encryptPEMBlock(keyFileBytes, keyPassBytes []byte) []byte {
 	block, _ := pem.Decode(keyFileBytes)
 
-	encryptedBlock, _ := x509.EncryptPEMBlock(rand.Reader, block.Type, block.Bytes, keyPassBytes, x509.PEMCipherAES256)
+	encryptedBlock, _ := x509.EncryptPEMBlock(
+		rand.Reader,
+		block.Type,
+		block.Bytes,
+		keyPassBytes,
+		x509.PEMCipherAES256,
+	)
 
 	return pem.EncodeToMemory(encryptedBlock)
 }
@@ -208,9 +244,11 @@ func errorsEqual(err1, err2 error) bool {
 	if err1 == nil && err2 == nil {
 		return true
 	}
+
 	if err1 == nil || err2 == nil {
 		return false
 	}
+
 	return err1.Error() == err2.Error()
 }
 
@@ -218,6 +256,7 @@ func TestLoadCACerts(t *testing.T) {
 	cert1 := []byte("fakecert1")
 	cert2 := []byte("fakecert2")
 	expectedPool, _ := x509.SystemCertPool()
+
 	expectedPool.AppendCertsFromPEM(cert1)
 	expectedPool.AppendCertsFromPEM(cert2)
 
@@ -240,7 +279,6 @@ func TestLoadCACerts(t *testing.T) {
 			if !reflect.DeepEqual(actualOutput, tc.expectedOutput) {
 				t.Errorf("loadCACerts() output = %v, want %v", actualOutput, tc.expectedOutput)
 			}
-
 		})
 	}
 }

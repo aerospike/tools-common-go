@@ -15,14 +15,14 @@ var configToFlagMap = map[string]string{}
 
 // InitConfig reads in config file and ENV variables if set. Should be called
 // from the root commands PersistentPreRunE function with the flags of the current command.
-func InitConfig(cfgFile string, instance string, flags *pflag.FlagSet) (string, error) {
+func InitConfig(cfgFile, instance string, flags *pflag.FlagSet) (string, error) {
 	if cfgFile != "" {
 		// Use config file from the flag.
 		viper.SetConfigFile(cfgFile)
 	} else {
 		viper.AddConfigPath(".")
-		viper.AddConfigPath(ASTOOLS_CONF_DIR)
-		viper.SetConfigName(ASTOOLS_CONF_NAME)
+		viper.AddConfigPath(AsToolsConfDir)
+		viper.SetConfigName(AsToolsConfName)
 	}
 
 	var configFileUsed string
@@ -57,13 +57,17 @@ func InitConfig(cfgFile string, instance string, flags *pflag.FlagSet) (string, 
 
 		// We must bind the flags for GetString to return flags as well as
 		// config file values.
-		viper.BindPFlag(alias, f)
+		err := viper.BindPFlag(alias, f)
+		if err != nil {
+			persistedErr = fmt.Errorf("failed to bind flag %s: %s", f.Name, err)
+			return
+		}
 
 		val := viper.GetString(f.Name)
 
 		// Apply the viper config value to the flag when viper has a value
 		if viper.IsSet(f.Name) && !f.Changed {
-			if err := f.Value.Set(fmt.Sprintf("%v", val)); err != nil {
+			if err := f.Value.Set(val); err != nil {
 				persistedErr = fmt.Errorf("failed to parse flag %s: %s", f.Name, err)
 			}
 		}
@@ -90,13 +94,15 @@ func BindPFlags(flags *pflag.FlagSet, section string) {
 
 // Reset resets the global configToFlagMap and viper instance.
 // Should be called before or after tests that use InitConfig or BindPFlags.
-// If using testify suites call it in the SetupSubTest function.
+// If using testify suites call it in the SetupTest function and or
+// SetupSubTests if using suite.T().Run(...).
 func Reset() {
 	configToFlagMap = map[string]string{}
+
 	viper.Reset()
 }
 
-func getAlias(key string, instance string) string {
+func getAlias(key, instance string) string {
 	if instance != "" {
 		instance = "_" + instance
 	}

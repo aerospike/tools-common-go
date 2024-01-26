@@ -1,4 +1,4 @@
-package test_utils
+package testutils
 
 import (
 	"crypto/rand"
@@ -11,7 +11,7 @@ import (
 	"time"
 )
 
-// Create The Certificate Authority (CA)
+// CATemplate is a template for a self-signed certificate.
 var CATemplate = &x509.Certificate{
 	SerialNumber: big.NewInt(1),
 	Subject: pkix.Name{
@@ -29,9 +29,9 @@ var CATemplate = &x509.Certificate{
 	IPAddresses:           []net.IP{net.ParseIP("127.0.0.1")},
 }
 
-var CAKey, _ = rsa.GenerateKey(rand.Reader, 512)
+var CAKey, _ = rsa.GenerateKey(rand.Reader, 2048)
 
-// Encode private key to PKCS#1 ASN.1 PEM.
+// KeyFileBytes is a PEM encoded private key.
 var KeyFileBytes = pem.EncodeToMemory(
 	&pem.Block{
 		Type:  "RSA PRIVATE KEY",

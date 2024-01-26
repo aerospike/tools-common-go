@@ -59,41 +59,40 @@ func (af *AerospikeFlags) NewFlagSet(fmtUsage UsageFormatter) *pflag.FlagSet {
 		"Set the TLS protocol selection criteria. This format is the same as"+
 			" Apache's SSLProtocol documented at https://httpd.apache.org/docs/current/mod/mod_ssl.html#ssl protocol.",
 	))
-	// cmd.PersistentFlags().Var(&aerospikeFlags.tlsCipherSuites, "tls-cipher-suites", fmtUsage("Set the TLS protocol selection criteria. This format is the same as Apache's SSLProtocol documented at https://httpd.apache.org/docs/current/mod/mod_ssl.html#ssl protocol."))
 
 	return f
 }
 
-func (f *AerospikeFlags) NewAerospikeConfig() *client.AerospikeConfig {
+func (af *AerospikeFlags) NewAerospikeConfig() *client.AerospikeConfig {
 	aerospikeConf := client.NewDefaultAerospikeConfig()
-	aerospikeConf.Seeds = f.Seeds.Seeds
-	aerospikeConf.User = f.User
-	aerospikeConf.Password = string(f.Password)
-	aerospikeConf.AuthMode = as.AuthMode(f.AuthMode)
+	aerospikeConf.Seeds = af.Seeds.Seeds
+	aerospikeConf.User = af.User
+	aerospikeConf.Password = string(af.Password)
+	aerospikeConf.AuthMode = as.AuthMode(af.AuthMode)
 
-	if f.TLSEnable {
-		aerospikeConf.Cert = f.TLSCertFile
-		aerospikeConf.Key = f.TLSKeyFile
-		aerospikeConf.KeyPass = f.TLSKeyFilePass
-		aerospikeConf.TLSProtocolsMinVersion = f.TLSProtocols.min
-		aerospikeConf.TLSProtocolsMaxVersion = f.TLSProtocols.max
+	if af.TLSEnable {
+		aerospikeConf.Cert = af.TLSCertFile
+		aerospikeConf.Key = af.TLSKeyFile
+		aerospikeConf.KeyPass = af.TLSKeyFilePass
+		aerospikeConf.TLSProtocolsMinVersion = af.TLSProtocols.min
+		aerospikeConf.TLSProtocolsMaxVersion = af.TLSProtocols.max
 
 		aerospikeConf.RootCA = [][]byte{}
 
-		if len(f.TLSRootCAFile) != 0 {
-			aerospikeConf.RootCA = append(aerospikeConf.RootCA, f.TLSRootCAFile)
+		if len(af.TLSRootCAFile) != 0 {
+			aerospikeConf.RootCA = append(aerospikeConf.RootCA, af.TLSRootCAFile)
 		}
 
-		aerospikeConf.RootCA = append(aerospikeConf.RootCA, f.TLSRootCAPath...)
+		aerospikeConf.RootCA = append(aerospikeConf.RootCA, af.TLSRootCAPath...)
 	}
 
 	for _, elem := range aerospikeConf.Seeds {
 		if elem.Port == 0 {
-			elem.Port = f.DefaultPort
+			elem.Port = af.DefaultPort
 		}
 
-		if elem.TLSName == "" && f.TLSName != "" {
-			elem.TLSName = f.TLSName
+		if elem.TLSName == "" && af.TLSName != "" {
+			elem.TLSName = af.TLSName
 		}
 	}
 
