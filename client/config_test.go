@@ -229,7 +229,7 @@ func TestLoadServerCertAndKey(t *testing.T) {
 func encryptPEMBlock(keyFileBytes, keyPassBytes []byte) []byte {
 	block, _ := pem.Decode(keyFileBytes)
 
-	encryptedBlock, _ := x509.EncryptPEMBlock(
+	encryptedBlock, _ := x509.EncryptPEMBlock( //nolint:staticcheck,lll // This needs to be addressed by aerospike as multiple projects require this functionality
 		rand.Reader,
 		block.Type,
 		block.Bytes,
