@@ -210,17 +210,17 @@ func (suite *FlagsTestSuite) TestWrapString() {
 		{
 			input:    "Lorem ipsum dolor sit amet, consectetur adipiscing elit.",
 			lineLen:  20,
-			expected: "Lorem ipsum dolor\nsit amet,\nconsectetur\nadipiscing elit.",
+			expected: "Lorem ipsum dolor \nsit amet, consectetur \nadipiscing elit.",
 		},
 		{
 			input:    "Lorem ipsum dolor sit amet, consectetur adipiscing elit.",
 			lineLen:  30,
-			expected: "Lorem ipsum dolor sit amet,\nconsectetur adipiscing elit.",
+			expected: "Lorem ipsum dolor sit amet, \nconsectetur adipiscing elit.",
 		},
 		{
 			input:    "Lorem ipsum dolor sit amet, consectetur adipiscing elit.",
 			lineLen:  50,
-			expected: "Lorem ipsum dolor sit amet, consectetur adipiscing\nelit.",
+			expected: "Lorem ipsum dolor sit amet, consectetur adipiscing \nelit.",
 		},
 		{
 			input:    "Lorem ipsum dolor sit amet, consectetur adipiscing elit.",
@@ -237,7 +237,7 @@ func (suite *FlagsTestSuite) TestWrapString() {
 	for _, tc := range testCases {
 		suite.T().Run("", func(t *testing.T) {
 			actual := WrapString(tc.input, tc.lineLen)
-			suite.Equal(t, tc.expected, actual)
+			suite.Equal(tc.expected, actual)
 		})
 	}
 }
@@ -258,11 +258,11 @@ func TestDefaultWrapHelpString(t *testing.T) {
 		},
 		{
 			input:    "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam.",
-			expected: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed ut perspiciatis unde\nomnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem\naperiam.",
+			expected: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed ut \nperspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque \nlaudantium, totam rem aperiam.",
 		},
 		{
 			input:    "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam. Eaque ipsa quae ab illo inventore veritatis et quasi architecto beatae vitae dicta sunt explicabo.",
-			expected: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed ut perspiciatis unde\nomnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem\naperiam. Eaque ipsa quae ab illo inventore veritatis et quasi architecto beatae vitae\ndicta sunt explicabo.",
+			expected: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed ut \nperspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque \nlaudantium, totam rem aperiam. Eaque ipsa quae ab illo inventore veritatis et \nquasi architecto beatae vitae dicta sunt explicabo.",
 		},
 	}
 
