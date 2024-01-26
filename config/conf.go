@@ -88,6 +88,9 @@ func BindPFlags(flags *pflag.FlagSet, section string) {
 	})
 }
 
+// Reset resets the global configToFlagMap and viper instance.
+// Should be called before or after tests that use InitConfig or BindPFlags.
+// If using testify suites call it in the SetupSubTest function.
 func Reset() {
 	configToFlagMap = map[string]string{}
 	viper.Reset()

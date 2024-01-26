@@ -13,8 +13,6 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
-var wd, _ = os.Getwd()
-
 const tomlConfigTxt = `
 [group1]
 str="localhost:3000"
@@ -51,22 +49,19 @@ group1_instance:
 
 type ConfigTestSuite struct {
 	suite.Suite
-	files   []string
+	file    string
+	fileTxt string
 	cfgFile string
 }
 
 func (suite *ConfigTestSuite) SetupSuite() {
-	suite.files = []string{wd + "/test-tmp/basic.conf", wd + "/test-tmp/basic.yaml"}
-
+	wd := os.Getwd()
+	suite.tmpDir = path.Join(wd, "test-tmp")
+	suite.file = path.Join(wd, "test-tmp", suite.file)
 	os.WriteFile(suite.files[0], []byte(tomlConfigTxt), 0644)
-	os.WriteFile(suite.files[1], []byte(yamlConfigTxt), 0644)
 }
 
 func (suite *ConfigTestSuite) TearDownSuite() {
-	for _, file := range suite.files {
-		os.Remove(file)
-	}
-
 	os.RemoveAll(wd + "/test-tmp")
 }
 
@@ -334,5 +329,21 @@ func (suite *ConfigTestSuite) TestInitConfigWithFlagsDefaults() {
 }
 
 func TestRunConfigTestSuite(t *testing.T) {
-	suite.Run(t, new(ConfigTestSuite))
+	files = []struct{
+		file string
+		fileTxt string
+	}{
+		"basic.conf", 
+		tomlConfigTxt
+	}{
+		"basic.yaml"
+		yamlConfigTxt
+	}
+
+	for _, file := range files {
+		cts := new(ConfigTestSuite)
+		cts.file = file.file
+		cts.fileTxt = file.fileTxt
+		suite.Run(t, cts)
+	}
 }

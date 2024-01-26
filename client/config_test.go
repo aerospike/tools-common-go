@@ -2,46 +2,16 @@ package client
 
 import (
 	"crypto/rand"
-	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
-	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
-	"math/big"
 	"reflect"
 	"testing"
-	"time"
 
 	as "github.com/aerospike/aerospike-client-go/v6"
+	"github.com/aerospike/tools-common-go/test_utils"
 )
-
-var key, _ = rsa.GenerateKey(rand.Reader, 512)
-
-// Encode private key to PKCS#1 ASN.1 PEM.
-var keyFileBytes = pem.EncodeToMemory(
-	&pem.Block{
-		Type:  "RSA PRIVATE KEY",
-		Bytes: x509.MarshalPKCS1PrivateKey(key),
-	},
-)
-
-// Generate certificate
-var tml = x509.Certificate{
-	NotBefore:    time.Now(),
-	NotAfter:     time.Now().AddDate(5, 0, 0),
-	SerialNumber: big.NewInt(123123),
-	Subject: pkix.Name{
-		CommonName:   "New Name",
-		Organization: []string{"New Org."},
-	},
-	BasicConstraintsValid: true,
-}
-var cert, _ = x509.CreateCertificate(rand.Reader, &tml, &tml, &key.PublicKey, key)
-var certFileBytes = pem.EncodeToMemory(&pem.Block{
-	Type:  "CERTIFICATE",
-	Bytes: cert,
-})
 
 func TestAerospikeConfig_NewClientPolicy(t *testing.T) {
 	config := &AerospikeConfig{
@@ -107,10 +77,13 @@ func TestAerospikeConfig_NewTLSConfig(t *testing.T) {
 		t.Errorf("NewTLSConfig() should return nil when config is empty")
 	}
 
+	rootCA, _ := test_utils.GenerateCert()
+	cert, _ := test_utils.GenerateCert()
+
 	config := &AerospikeConfig{
-		RootCA:                 [][]byte{[]byte("fakecert1")},
-		Cert:                   certFileBytes,
-		Key:                    keyFileBytes,
+		RootCA:                 [][]byte{rootCA},
+		Cert:                   cert,
+		Key:                    test_utils.KeyFileBytes,
 		KeyPass:                []byte("fakepassphrase"),
 		TLSProtocolsMinVersion: 1,
 		TLSProtocolsMaxVersion: 3,
@@ -124,7 +97,7 @@ func TestAerospikeConfig_NewTLSConfig(t *testing.T) {
 		t.Errorf("NewTLSConfig() returned an unexpected error: %v", err)
 	}
 
-	if !reflect.DeepEqual(tlsConfig.RootCAs, expectedServerPool) {
+	if !tlsConfig.RootCAs.Equal(expectedServerPool) {
 		t.Errorf("NewTLSConfig() returned incorrect RootCAs, got %v, want %v", tlsConfig.RootCAs, expectedServerPool)
 	}
 
@@ -163,7 +136,8 @@ func TestNewDefaultAerospikeHostConfig(t *testing.T) {
 
 func TestLoadServerCertAndKey(t *testing.T) {
 	keyPassBytes := []byte("fakepassphrase")
-	expectedCert, _ := tls.X509KeyPair(certFileBytes, keyFileBytes)
+	certFileBytes, _ := test_utils.GenerateCert()
+	expectedCert, _ := tls.X509KeyPair(certFileBytes, test_utils.KeyFileBytes)
 
 	testCases := []struct {
 		name           string
@@ -176,7 +150,7 @@ func TestLoadServerCertAndKey(t *testing.T) {
 		{
 			name:           "ValidCertAndKey",
 			certFileBytes:  certFileBytes,
-			keyFileBytes:   keyFileBytes,
+			keyFileBytes:   test_utils.KeyFileBytes,
 			keyPassBytes:   keyPassBytes,
 			expectedOutput: []tls.Certificate{expectedCert},
 			expectedError:  nil,
@@ -192,7 +166,7 @@ func TestLoadServerCertAndKey(t *testing.T) {
 		{
 			name:           "EncryptedKeyBlock",
 			certFileBytes:  certFileBytes,
-			keyFileBytes:   encryptPEMBlock(keyFileBytes, keyPassBytes),
+			keyFileBytes:   encryptPEMBlock(test_utils.KeyFileBytes, keyPassBytes),
 			keyPassBytes:   keyPassBytes,
 			expectedOutput: []tls.Certificate{expectedCert},
 			expectedError:  nil,
@@ -200,7 +174,7 @@ func TestLoadServerCertAndKey(t *testing.T) {
 		{
 			name:           "InvalidPassphrase",
 			certFileBytes:  certFileBytes,
-			keyFileBytes:   encryptPEMBlock(keyFileBytes, []byte("wrongpassphrase")),
+			keyFileBytes:   encryptPEMBlock(test_utils.KeyFileBytes, []byte("wrongpassphrase")),
 			keyPassBytes:   keyPassBytes,
 			expectedOutput: nil,
 			expectedError:  fmt.Errorf("failed to decrypt PEM Block: `x509: decryption password incorrect`"),

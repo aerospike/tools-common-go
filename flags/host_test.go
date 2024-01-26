@@ -11,10 +11,11 @@ type HostTestSuite struct {
 	suite.Suite
 }
 
-func (suite *HostTestSuite) TestHostTLSPort() {
+func (suite *HostTestSuite) TestHostTLSPortSetGet() {
 	testCases := []struct {
 		input  string
 		output HostTLSPortSliceFlag
+		slice  []string
 	}{
 		{
 			"127.0.0.1",
@@ -26,6 +27,7 @@ func (suite *HostTestSuite) TestHostTLSPort() {
 					},
 				},
 			},
+			[]string{"127.0.0.1"},
 		},
 		{
 			"127.0.0.1,127.0.0.2",
@@ -40,6 +42,7 @@ func (suite *HostTestSuite) TestHostTLSPort() {
 					},
 				},
 			},
+			[]string{"127.0.0.1", "127.0.0.2"},
 		},
 		{
 			"127.0.0.2:3002",
@@ -52,6 +55,7 @@ func (suite *HostTestSuite) TestHostTLSPort() {
 					},
 				},
 			},
+			[]string{"127.0.0.2:3002"},
 		},
 		{
 			"127.0.0.2:3002,127.0.0.3:3003",
@@ -68,6 +72,7 @@ func (suite *HostTestSuite) TestHostTLSPort() {
 					},
 				},
 			},
+			[]string{"127.0.0.2:3002", "127.0.0.3:3003"},
 		},
 		{
 			"127.0.0.3:tls-name:3003",
@@ -81,6 +86,7 @@ func (suite *HostTestSuite) TestHostTLSPort() {
 					},
 				},
 			},
+			[]string{"127.0.0.3:tls-name:3003"},
 		},
 		{
 			"127.0.0.3:tls-name:3003,127.0.0.4:tls-name4:3004",
@@ -99,6 +105,7 @@ func (suite *HostTestSuite) TestHostTLSPort() {
 					},
 				},
 			},
+			[]string{"127.0.0.3:tls-name:3003", "127.0.0.4:tls-name4:3004"},
 		},
 		{
 			"127.0.0.3:3003,127.0.0.4:tls-name4:3004",
@@ -116,6 +123,7 @@ func (suite *HostTestSuite) TestHostTLSPort() {
 					},
 				},
 			},
+			[]string{"127.0.0.3:3003", "127.0.0.4:tls-name4:3004"},
 		},
 		{
 			"[2001:0db8:85a3:0000:0000:8a2e:0370:7334]",
@@ -127,6 +135,7 @@ func (suite *HostTestSuite) TestHostTLSPort() {
 					},
 				},
 			},
+			[]string{"2001:0db8:85a3:0000:0000:8a2e:0370:7334"},
 		},
 		{
 			"[fe80::1ff:fe23:4567:890a]:3002",
@@ -139,6 +148,7 @@ func (suite *HostTestSuite) TestHostTLSPort() {
 					},
 				},
 			},
+			[]string{"fe80::1ff:fe23:4567:890a:3002"},
 		},
 		{
 			"[100::]:tls-name:3003",
@@ -152,6 +162,7 @@ func (suite *HostTestSuite) TestHostTLSPort() {
 					},
 				},
 			},
+			[]string{"100:::tls-name:3003"},
 		},
 	}
 
@@ -159,7 +170,75 @@ func (suite *HostTestSuite) TestHostTLSPort() {
 		suite.T().Run(tc.input, func(t *testing.T) {
 			actual := NewHostTLSPortSliceFlag()
 			actual.Set(tc.input)
-			suite.Equal(actual, tc.output)
+			suite.Equal(tc.output, actual)
+			suite.Equal(tc.slice, actual.GetSlice())
+		})
+
+	}
+}
+
+func (suite *HostTestSuite) TestHostTLSPortAppend() {
+	testCases := []struct {
+		input  string
+		append string
+		output HostTLSPortSliceFlag
+	}{
+		{
+			"127.0.0.1",
+			"127.0.0.2",
+			HostTLSPortSliceFlag{
+				useDefault: false,
+				Seeds: client.HostTLSPortSlice{
+					{
+						Host: "127.0.0.1",
+					},
+					{
+						Host: "127.0.0.2",
+					},
+				},
+			},
+		},
+	}
+
+	for _, tc := range testCases {
+		suite.T().Run(tc.input, func(t *testing.T) {
+			actual := NewHostTLSPortSliceFlag()
+			actual.Set(tc.input)
+			actual.Set(tc.append)
+			suite.Equal(tc.output, actual)
+			suite.Equal("", actual.String())
+		})
+
+	}
+}
+
+func (suite *HostTestSuite) TestHostTLSPortString() {
+	testCases := []struct {
+		input  HostTLSPortSliceFlag
+		output string
+	}{
+		{
+			HostTLSPortSliceFlag{
+				useDefault: false,
+				Seeds: client.HostTLSPortSlice{
+					{
+						Host: "127.0.0.1",
+						Port: 3000,
+					},
+					{
+						Host:    "127.0.0.2",
+						TLSName: "tls-name",
+						Port:    3002,
+					},
+				},
+			},
+			"[127.0.0.1:3000, 127.0.0.2:tls-name:3002]",
+		},
+	}
+
+	for _, tc := range testCases {
+		suite.T().Run(tc.output, func(t *testing.T) {
+			suite.Equal(tc.output, tc.input.String())
 		})
 
 	}
