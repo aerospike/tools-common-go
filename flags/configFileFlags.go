@@ -7,17 +7,18 @@ import (
 	"github.com/spf13/pflag"
 )
 
-// TODO: doc string
+// ConfFileFlags represents the flags related to setting up the config file.
 type ConfFileFlags struct {
-	File     string
-	Instance string
+	File     string // Config file path.
+	Instance string // Instance name appended to top-level context e.g. instance=tls will read from cluster_tls.
 }
 
 func NewConfFileFlags() *ConfFileFlags {
 	return &ConfFileFlags{}
 }
 
-// TODO: doc string
+// NewFlagSet creates a new pflag.FlagSet with the config file flags.
+// The fmtUsage parameter is a function that formats the usage string.
 func (cf *ConfFileFlags) NewFlagSet(fmtUsage UsageFormatter) *pflag.FlagSet {
 	f := &pflag.FlagSet{}
 

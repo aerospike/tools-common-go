@@ -9,6 +9,8 @@ import (
 	as "github.com/aerospike/aerospike-client-go/v6"
 )
 
+// AerospikeConfig represents the intermediate configuration for an Aerospike
+// client. This can be constructed directly using flags.AerospikeFlags or
 type AerospikeConfig struct {
 	Seeds                  HostTLSPortSlice
 	User                   string
@@ -23,11 +25,15 @@ type AerospikeConfig struct {
 	// TLSCipherSuites        []uint16 // TODO
 }
 
+// NewDefaultAerospikeConfig creates a new default AerospikeConfig instance.
 func NewDefaultAerospikeConfig() *AerospikeConfig {
 	return &AerospikeConfig{
 		Seeds: HostTLSPortSlice{NewDefaultHostTLSPort()},
 	}
 }
+
+// NewClientPolicy creates a new Aerospike client policy based on the
+// AerospikeConfig.
 
 func (ac *AerospikeConfig) NewClientPolicy() (*as.ClientPolicy, error) {
 	clientPolicy := as.NewClientPolicy()
