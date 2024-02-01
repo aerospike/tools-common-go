@@ -30,8 +30,6 @@ func InitConfig(cfgFile, instance string, flags *pflag.FlagSet) (string, error) 
 		configFileUsed = path.Join(AsToolsConfDir, AsToolsConfName)
 	}
 
-	viper.GetViper().ConfigFileUsed()
-
 	if strings.HasSuffix(configFileUsed, ".conf") {
 		// If .conf then explicitly set type to toml.
 		viper.SetConfigType("toml")
