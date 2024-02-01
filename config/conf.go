@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"path"
 	"strings"
 
 	"github.com/spf13/pflag"
@@ -16,33 +17,35 @@ var configToFlagMap = map[string]string{}
 // InitConfig reads in config file and ENV variables if set. Should be called
 // from the root commands PersistentPreRunE function with the flags of the current command.
 func InitConfig(cfgFile, instance string, flags *pflag.FlagSet) (string, error) {
+	configFileUsed := ""
+
 	if cfgFile != "" {
 		// Use config file from the flag.
 		viper.SetConfigFile(cfgFile)
+		configFileUsed = cfgFile
 	} else {
 		viper.AddConfigPath(".")
 		viper.AddConfigPath(AsToolsConfDir)
 		viper.SetConfigName(AsToolsConfName)
+		configFileUsed = path.Join(AsToolsConfDir, AsToolsConfName)
 	}
 
-	var configFileUsed string
+	viper.GetViper().ConfigFileUsed()
 
-	if strings.HasSuffix(cfgFile, ".conf") {
+	if strings.HasSuffix(configFileUsed, ".conf") {
 		// If .conf then explicitly set type to toml.
 		viper.SetConfigType("toml")
-		if err := viper.ReadInConfig(); err == nil {
-			configFileUsed = viper.ConfigFileUsed()
-		} else if cfgFile != "" {
+
+		if err := viper.ReadInConfig(); err != nil {
 			return "", fmt.Errorf("failed to read config file: %w", err)
 		}
 	} else {
-		err := viper.ReadInConfig()
-		if err != nil {
+		if err := viper.ReadInConfig(); err != nil {
 			return "", fmt.Errorf("failed to read config file: %w", err)
 		}
-
-		configFileUsed = viper.ConfigFileUsed()
 	}
+
+	configFileUsed = viper.ConfigFileUsed()
 
 	if configFileUsed == "" {
 		return "", nil
