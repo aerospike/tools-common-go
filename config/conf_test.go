@@ -1,157 +1,338 @@
 package config
 
 import (
-	_ "embed"
-	"path/filepath"
+	"fmt"
+	"os"
+	"path"
 	"testing"
 
-	"github.com/go-test/deep"
+	"github.com/spf13/cobra"
+	"github.com/spf13/pflag"
+	"github.com/stretchr/testify/suite"
 )
 
-const (
-	testConfigPath = "./testdata/configs"
-)
+const tomlConfigTxt = `
+[group1]
+str="localhost:3000"
+int=3000
+bool=true
 
-func Test_Config_GetConfig(t *testing.T) {
+[group2]
+str2="localhost:4000"
+int2=4000
+bool2=false
 
-	basicResTOML := map[string]any{
-		"cluster": map[string]any{
-			"host":       "localhost:3000",
-			"port":       int64(3000), //go-toml unmarshals int as int64
-			"tls-enable": false,
-			"user":       "",
-		},
-		"other": map[string]any{
-			"outputmode": "table",
-		},
+[group1_instance]
+str="localhost:3000 instance"
+int=5000
+bool=true
+`
+
+const yamlConfigTxt = `
+group1:
+  str: "localhost:3000"
+  int:  3000
+  bool:  true
+
+group2:
+  str2: "localhost:4000"
+  int2: 4000
+  bool2: false
+
+group1_instance:
+  str: "localhost:3000 instance"
+  int: 5000
+  bool: true
+  `
+
+type ConfigTestSuite struct {
+	suite.Suite
+	tmpDir        string
+	file          string
+	fileTxt       string
+	actualCfgFile string
+}
+
+func (suite *ConfigTestSuite) SetupSuite() {
+	wd, _ := os.Getwd()
+	suite.tmpDir = path.Join(wd, "test-tmp")
+	suite.file = path.Join(wd, "test-tmp", suite.file)
+
+	err := os.MkdirAll(suite.tmpDir, 0o0777)
+	if err != nil {
+		suite.FailNow("Failed to create tmp dir", err)
 	}
 
-	basicResYAML := map[string]any{
-		"cluster": map[string]any{
-			"host":       "localhost:3000",
-			"port":       3000,
-			"tls-enable": false,
-			"user":       "",
-		},
-		"other": map[string]any{
-			"outputmode": "table",
-		},
-	}
-
-	type args struct {
-		cfgPath string
-	}
-	tests := []struct {
-		name    string
-		want    any
-		wantErr bool
-		config  *Config
-	}{
-		{
-			name: "basic toml",
-			config: NewConfig(
-				NewToolsConfigLoaderFile(filepath.Join(testConfigPath, "basic.toml")),
-			),
-			want:    basicResTOML,
-			wantErr: false,
-		},
-		{
-			name: "basic yaml",
-			config: NewConfig(
-				NewToolsConfigLoaderFile(filepath.Join(testConfigPath, "basic.yaml")),
-			),
-			want:    basicResYAML,
-			wantErr: false,
-		},
-	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			got, err := tt.config.GetConfig()
-			if (err != nil) != tt.wantErr {
-				t.Errorf("getConfigMap() error = %v, wantErr %v", err, tt.wantErr)
-				return
-			}
-			if diff := deep.Equal(got, tt.want); diff != nil {
-				t.Error(diff)
-			}
-		})
+	err = os.WriteFile(suite.file, []byte(suite.fileTxt), 0o0600)
+	if err != nil {
+		suite.FailNow("Failed to write config file", err)
 	}
 }
 
-func Test_Config_ValidateConf(t *testing.T) {
+func (suite *ConfigTestSuite) TearDownSuite() {
+	os.RemoveAll(suite.tmpDir)
+}
 
-	basicTOMLPath := filepath.Join(testConfigPath, "basic.toml")
-	fileLoaderTOML := NewToolsConfigLoaderFile(basicTOMLPath)
+func (suite *ConfigTestSuite) SetupTest() {
+	Reset()
+}
 
-	basicYAMLPath := filepath.Join(testConfigPath, "basic.yaml")
-	fileLoaderYAML := NewToolsConfigLoaderFile(basicYAMLPath)
+func (suite *ConfigTestSuite) NewCmds(file, instance string) (rootCmd, cmd1, cmd2 *cobra.Command) {
+	rootCmd = &cobra.Command{
+		Use: "test",
+		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+			cfgFileTmp, err := InitConfig(file, instance, cmd.Flags())
+			if err != nil {
+				return fmt.Errorf("Failed to initialize config: %s", err)
+			}
 
-	failsLoader := Loader{
-		Getters: []Getter{
-			&GetterFile{
-				ConfigPath: "badpath",
-			},
+			suite.actualCfgFile = cfgFileTmp
+
+			return nil
 		},
 	}
 
-	failsValidationLoader := Loader{
-		Getters: []Getter{
-			&GetterBytes{
-				ConfigData: []byte("[cluster]\nhost=1234"),
-			},
-		},
-		Unmarshallers: []Unmarshaller{
-			&UnmarshallerTOML{},
+	cmd1 = &cobra.Command{
+		Use: "test1",
+		Run: func(cmd *cobra.Command, args []string) {
 		},
 	}
 
-	type args struct {
-		schemas []string
+	cmd2 = &cobra.Command{
+		Use: "test2",
+		Run: func(cmd *cobra.Command, args []string) {
+		},
 	}
-	tests := []struct {
-		name    string
-		args    args
-		wantErr bool
-		config  *Config
+
+	rootCmd.AddCommand(cmd1)
+	rootCmd.AddCommand(cmd2)
+
+	return rootCmd, cmd1, cmd2
+}
+
+// Tests the whether different flags on different cmcan read the same values
+// from the config file.
+func (suite *ConfigTestSuite) TestInitConfigWithDuplicateFlags() {
+	rootCmd, cmd1, cmd2 := suite.NewCmds(suite.file, "")
+
+	flagSet := &pflag.FlagSet{}
+	flagSet.String("str", "", "string flag")
+	flagSet.Int("int", 0, "int flag")
+	flagSet.Bool("bool", false, "bool flag")
+	BindPFlags(flagSet, "group1")
+
+	flagSet2 := &pflag.FlagSet{}
+	flagSet2.String("str", "", "string flag")
+	flagSet2.Int("int", 0, "int flag")
+	flagSet2.Bool("bool", false, "bool flag")
+	BindPFlags(flagSet2, "group1")
+
+	cmd1.Flags().AddFlagSet(flagSet)
+	cmd2.Flags().AddFlagSet(flagSet2)
+
+	// Cmd1
+	rootCmd.SetArgs([]string{"test1"})
+	err := rootCmd.Execute()
+
+	suite.NoError(err)
+
+	str, err := cmd1.Flags().GetString("str")
+	suite.NoError(err)
+	suite.Equal("localhost:3000", str)
+
+	intVal, err := cmd1.Flags().GetInt("int")
+	suite.NoError(err)
+	suite.Equal(3000, intVal)
+
+	boolVal, err := cmd1.Flags().GetBool("bool")
+	suite.NoError(err)
+	suite.Equal(true, boolVal)
+
+	// Cmd2
+	rootCmd.SetArgs([]string{"test2"})
+	err = rootCmd.Execute()
+
+	suite.NoError(err)
+
+	str, err = cmd2.Flags().GetString("str")
+	suite.NoError(err)
+	suite.Equal("localhost:3000", str)
+
+	intVal, err = cmd2.Flags().GetInt("int")
+	suite.NoError(err)
+	suite.Equal(3000, intVal)
+
+	boolVal, err = cmd2.Flags().GetBool("bool")
+	suite.NoError(err)
+	suite.Equal(true, boolVal)
+
+	suite.Equal(suite.actualCfgFile, suite.file)
+}
+
+func (suite *ConfigTestSuite) TestInitConfigWithMultiSections() {
+	rootCmd, cmd1, _ := suite.NewCmds(suite.file, "")
+
+	flagSet := &pflag.FlagSet{}
+	flagSet.String("str", "", "string flag")
+	flagSet.Int("int", 0, "int flag")
+	flagSet.Bool("bool", false, "bool flag")
+	BindPFlags(flagSet, "group1")
+
+	flagSet2 := &pflag.FlagSet{}
+	flagSet2.String("str2", "", "string flag")
+	flagSet2.Int("int2", 0, "int flag")
+	flagSet2.Bool("bool2", false, "bool flag")
+	BindPFlags(flagSet2, "group2")
+
+	cmd1.Flags().AddFlagSet(flagSet2)
+	cmd1.Flags().AddFlagSet(flagSet)
+
+	// Cmd1
+	rootCmd.SetArgs([]string{"test1"})
+	err := rootCmd.Execute()
+
+	suite.NoError(err)
+
+	str, err := cmd1.Flags().GetString("str")
+	suite.NoError(err)
+	suite.Equal("localhost:3000", str)
+
+	intVal, err := cmd1.Flags().GetInt("int")
+	suite.NoError(err)
+	suite.Equal(3000, intVal)
+
+	boolVal, err := cmd1.Flags().GetBool("bool")
+	suite.NoError(err)
+	suite.Equal(true, boolVal)
+
+	str, err = cmd1.Flags().GetString("str2")
+	suite.NoError(err)
+	suite.Equal("localhost:4000", str)
+
+	intVal, err = cmd1.Flags().GetInt("int2")
+	suite.NoError(err)
+	suite.Equal(4000, intVal)
+
+	boolVal, err = cmd1.Flags().GetBool("bool2")
+	suite.NoError(err)
+	suite.Equal(false, boolVal)
+
+	suite.Equal(suite.actualCfgFile, suite.file)
+}
+
+func (suite *ConfigTestSuite) TestInitConfigWithInstance() {
+	rootCmd, cmd1, _ := suite.NewCmds(suite.file, "instance")
+
+	flagSet := &pflag.FlagSet{}
+	flagSet.String("str", "", "string flag")
+	flagSet.Int("int", 0, "int flag")
+	flagSet.Bool("bool", false, "bool flag")
+	BindPFlags(flagSet, "group1")
+
+	cmd1.Flags().AddFlagSet(flagSet)
+
+	// Cmd1
+	rootCmd.SetArgs([]string{"test1"})
+	err := rootCmd.Execute()
+
+	suite.NoError(err)
+
+	str, err := cmd1.Flags().GetString("str")
+	suite.NoError(err)
+	suite.Equal("localhost:3000 instance", str)
+
+	intVal, err := cmd1.Flags().GetInt("int")
+	suite.NoError(err)
+	suite.Equal(5000, intVal)
+
+	boolVal, err := cmd1.Flags().GetBool("bool")
+	suite.NoError(err)
+	suite.Equal(true, boolVal)
+
+	suite.Equal(suite.actualCfgFile, suite.file)
+}
+
+func (suite *ConfigTestSuite) TestInitConfigWithFlagsOverwrite() {
+	rootCmd, cmd1, _ := suite.NewCmds(suite.file, "")
+
+	flagSet := &pflag.FlagSet{}
+	flagSet.String("str", "", "string flag")
+	flagSet.Int("int", 0, "int flag")
+	flagSet.Bool("bool", false, "bool flag")
+	BindPFlags(flagSet, "group1")
+
+	cmd1.Flags().AddFlagSet(flagSet)
+
+	// Cmd1
+	rootCmd.SetArgs([]string{"test1", "--str", "overwrite"})
+	err := rootCmd.Execute()
+
+	suite.NoError(err)
+
+	str, err := cmd1.Flags().GetString("str")
+	suite.NoError(err)
+	suite.Equal("overwrite", str)
+
+	intVal, err := cmd1.Flags().GetInt("int")
+	suite.NoError(err)
+	suite.Equal(3000, intVal)
+
+	boolVal, err := cmd1.Flags().GetBool("bool")
+	suite.NoError(err)
+	suite.Equal(true, boolVal)
+}
+
+func (suite *ConfigTestSuite) TestInitConfigWithFlagsDefaults() {
+	rootCmd, cmd1, _ := suite.NewCmds(suite.file, "DNE")
+
+	flagSet := &pflag.FlagSet{}
+	flagSet.String("str", "foo", "string flag")
+	flagSet.Int("int", 99, "int flag")
+	flagSet.Bool("bool", true, "bool flag")
+	BindPFlags(flagSet, "group1")
+
+	cmd1.Flags().AddFlagSet(flagSet)
+
+	// Cmd1
+	rootCmd.SetArgs([]string{"test1"})
+	err := rootCmd.Execute()
+
+	suite.NoError(err)
+
+	str, err := cmd1.Flags().GetString("str")
+	suite.NoError(err)
+	suite.Equal("foo", str)
+
+	intVal, err := cmd1.Flags().GetInt("int")
+	suite.NoError(err)
+	suite.Equal(99, intVal)
+
+	boolVal, err := cmd1.Flags().GetBool("bool")
+	suite.NoError(err)
+	suite.Equal(true, boolVal)
+
+	suite.Equal(suite.actualCfgFile, suite.file)
+}
+
+func TestRunConfigTestSuite(t *testing.T) {
+	files := []struct {
+		file    string
+		fileTxt string
 	}{
 		{
-			name: "passes validation, toml",
-			args: args{
-				schemas: []string{ToolsAerospikeClusterSchema},
-			},
-			wantErr: false,
-			config:  NewConfig(fileLoaderTOML),
+			"basic.conf",
+			tomlConfigTxt,
 		},
 		{
-			name: "passes validation, yaml",
-			args: args{
-				schemas: []string{ToolsAerospikeClusterSchema, ToolsAerospikeClusterSchema},
-			},
-			wantErr: false,
-			config:  NewConfig(fileLoaderYAML),
-		},
-		{
-			name: "fails validation, toml",
-			args: args{
-				schemas: []string{ToolsAerospikeClusterSchema},
-			},
-			wantErr: true,
-			config:  NewConfig(&failsValidationLoader),
-		},
-		{
-			name: "fails to load",
-			args: args{
-				schemas: []string{ToolsAerospikeClusterSchema},
-			},
-			wantErr: true,
-			config:  NewConfig(&failsLoader),
+			"basic.yaml",
+			yamlConfigTxt,
 		},
 	}
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			if err := tt.config.ValidateConfig(tt.args.schemas); (err != nil) != tt.wantErr {
-				t.Errorf("ValidateConfig() error = %v, wantErr %v", err, tt.wantErr)
-			}
-		})
+
+	for _, file := range files {
+		cts := new(ConfigTestSuite)
+		cts.file = file.file
+		cts.fileTxt = file.fileTxt
+		suite.Run(t, cts)
 	}
 }

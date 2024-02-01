@@ -9,6 +9,8 @@ import (
 	as "github.com/aerospike/aerospike-client-go/v6"
 )
 
+// AerospikeConfig represents the intermediate configuration for an Aerospike
+// client. This can be constructed directly using flags.AerospikeFlags or
 type AerospikeConfig struct {
 	Seeds                  HostTLSPortSlice
 	User                   string
@@ -23,11 +25,15 @@ type AerospikeConfig struct {
 	// TLSCipherSuites        []uint16 // TODO
 }
 
-func NewDefaultAerospikeHostConfig() *AerospikeConfig {
+// NewDefaultAerospikeConfig creates a new default AerospikeConfig instance.
+func NewDefaultAerospikeConfig() *AerospikeConfig {
 	return &AerospikeConfig{
 		Seeds: HostTLSPortSlice{NewDefaultHostTLSPort()},
 	}
 }
+
+// NewClientPolicy creates a new Aerospike client policy based on the
+// AerospikeConfig.
 
 func (ac *AerospikeConfig) NewClientPolicy() (*as.ClientPolicy, error) {
 	clientPolicy := as.NewClientPolicy()
@@ -124,8 +130,8 @@ func loadServerCertAndKey(certFileBytes, keyFileBytes, keyPassBytes []byte) ([]t
 	}
 
 	// Check and Decrypt the Key Block using passphrase
-	if x509.IsEncryptedPEMBlock(keyBlock) { //nolint:staticcheck // This needs to be addressed by aerospike as multiple projects require this functionality
-		decryptedDERBytes, err := x509.DecryptPEMBlock(keyBlock, keyPassBytes) //nolint:staticcheck // This needs to be addressed by aerospike as multiple projects require this functionality
+	if x509.IsEncryptedPEMBlock(keyBlock) { //nolint:staticcheck,lll // This needs to be addressed by aerospike as multiple projects require this functionality
+		decryptedDERBytes, err := x509.DecryptPEMBlock(keyBlock, keyPassBytes) //nolint:staticcheck,lll // This needs to be addressed by aerospike as multiple projects require this functionality
 		if err != nil {
 			return nil, fmt.Errorf("failed to decrypt PEM Block: `%s`", err)
 		}

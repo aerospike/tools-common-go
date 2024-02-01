@@ -8,7 +8,6 @@ import (
 )
 
 func TestCert(t *testing.T) {
-
 	envVar := "flag_test_cert_env"
 	envVarVal := "birdistheword"
 	envVarB64 := "flag_test_cert_envb64"
@@ -32,12 +31,14 @@ func TestCert(t *testing.T) {
 	}
 
 	fpath := "./testdata/filedata"
+
 	fdata, err := os.ReadFile(fpath)
 	if err != nil {
 		t.Error(err.Error())
 	}
+
 	// trim the trailing new line to match readFromFile
-	fdata = []byte(bytes.TrimSuffix(fdata, []byte("\n")))
+	fdata = bytes.TrimSuffix(fdata, []byte("\n"))
 
 	testCases := []struct {
 		name    string
@@ -101,14 +102,11 @@ func TestCert(t *testing.T) {
 				t.Errorf("flagFormatParser() = %v, want %v", actual, tc.output)
 			}
 		})
-
 	}
 }
 
 func TestCertPath(t *testing.T) {
-
 	cert1 := []byte("fakecert")
-
 	testCases := []struct {
 		name    string
 		input   string
@@ -141,6 +139,5 @@ func TestCertPath(t *testing.T) {
 				t.Errorf("flagFormatParser() = %v, want %v", actual, tc.output)
 			}
 		})
-
 	}
 }

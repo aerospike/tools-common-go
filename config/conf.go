@@ -1,105 +1,128 @@
 package config
 
 import (
-	"encoding/json"
-	"errors"
 	"fmt"
+	"path"
+	"strings"
 
-	"github.com/xeipuuv/gojsonschema"
+	"github.com/spf13/pflag"
+	"github.com/spf13/viper"
 )
 
-// CFGLoader defines an interface for loading
-// config files.
-type CFGLoader interface {
-	Load(v any) error
-}
+// A map that maps config keys i.e. "cluster.host" to flag names i.e. "host".
+// This is only needed because if "instance". Otherwise we would just run
+// RegisterAlias inside the BindPFlags function.
+var configToFlagMap = map[string]string{}
 
-// Config is the base definition of a Config file.
-// It contains config Data retrieved and unmarshaled
-// by a CFGLoader.
-type Config struct {
-	// Data is unmarshaled config data.
-	Data map[string]any
-	// Loaded signifies whether Data has already been
-	// loaded by Loader. All Config methods check this to
-	// see if Data needs to be re-loaded before use.
-	Loaded bool
-	// Loader retrieves and unmarshals the config data.
-	Loader CFGLoader
-}
+// InitConfig reads in config file and ENV variables if set. Should be called
+// from the root commands PersistentPreRunE function with the flags of the current command.
+func InitConfig(cfgFile, instance string, flags *pflag.FlagSet) (string, error) {
+	configFileUsed := ""
 
-// NewConfig returns a new config set with the passed in cfgLoader.
-func NewConfig(cfgLoader *Loader) *Config {
-	res := &Config{
-		Loader: cfgLoader,
+	if cfgFile != "" {
+		// Use config file from the flag.
+		viper.SetConfigFile(cfgFile)
+		configFileUsed = cfgFile
+	} else {
+		viper.AddConfigPath(".")
+		viper.AddConfigPath(AsToolsConfDir)
+		viper.SetConfigName(AsToolsConfName)
+		configFileUsed = path.Join(AsToolsConfDir, AsToolsConfName)
 	}
 
-	return res
-}
+	if strings.HasSuffix(configFileUsed, ".conf") {
+		// If .conf then explicitly set type to toml.
+		viper.SetConfigType("toml")
 
-// Load loads the config data into the Config.Data.
-func (o *Config) Load() error {
-	if o.Loaded {
-		return nil
+		if err := viper.ReadInConfig(); err != nil {
+			return "", fmt.Errorf("failed to read config file: %w", err)
+		}
+	} else {
+		if err := viper.ReadInConfig(); err != nil {
+			return "", fmt.Errorf("failed to read config file: %w", err)
+		}
 	}
 
-	err := o.Loader.Load(&o.Data)
-	if err != nil {
-		return err
+	configFileUsed = viper.ConfigFileUsed()
+
+	if configFileUsed == "" {
+		return "", nil
 	}
 
-	o.Loaded = true
+	var persistedErr error
 
-	return nil
-}
+	flags.VisitAll(func(f *pflag.Flag) {
+		// Convert "host" into "cluster_<instance>.host"
+		alias := getAlias(f.Name, instance)
 
-// Refresh sets Config.Loaded to false, which marks the config data
-// to be reloaded.
-func (o *Config) Refresh() {
-	o.Loaded = false
-}
+		// Could be done in BindPFlags if not for "instance". Without this
+		// we would need to do viper.GetString("cluster.host") instead of
+		// viper.GetString("host").
+		viper.RegisterAlias(f.Name, alias)
 
-// GetConfig returns the config data, Config.Data.
-func (o *Config) GetConfig() (map[string]any, error) {
-	err := o.Load()
-	if err != nil {
-		return nil, err
-	}
-
-	return o.Data, nil
-}
-
-// ValidateConf validates the config data against the passed in JSON schema.
-func (o *Config) ValidateConfig(schemas []string) error {
-	confMap, err := o.GetConfig()
-	if err != nil {
-		return fmt.Errorf("unable to get config: %w", err)
-	}
-
-	jsonBytes, err := json.Marshal(confMap)
-	if err != nil {
-		return fmt.Errorf("unable to marshal config map to json: %w", err)
-	}
-
-	confLoader := gojsonschema.NewStringLoader(string(jsonBytes))
-
-	for _, schema := range schemas {
-		schemaloader := gojsonschema.NewStringLoader(schema)
-		validResult, err := gojsonschema.Validate(schemaloader, confLoader)
-
+		// We must bind the flags for GetString to return flags as well as
+		// config file values.
+		err := viper.BindPFlag(alias, f)
 		if err != nil {
-			return fmt.Errorf("unable to validate config schema: %w", err)
+			persistedErr = fmt.Errorf("failed to bind flag %s: %s", f.Name, err)
+			return
 		}
 
-		if !validResult.Valid() {
-			verrs := fmt.Errorf("invalid config file")
-			for _, err := range validResult.Errors() {
-				verrs = errors.Join(verrs, fmt.Errorf("- %s", err))
+		val := viper.GetString(f.Name)
+
+		// Apply the viper config value to the flag when viper has a value
+		if viper.IsSet(f.Name) && !f.Changed {
+			if err := f.Value.Set(val); err != nil {
+				persistedErr = fmt.Errorf("failed to parse flag %s: %s", f.Name, err)
 			}
-
-			return verrs
 		}
+	})
+
+	return configFileUsed, persistedErr
+}
+
+// BindPFlags binds the flags to viper. Should be called after the flag set is
+// created. The section is prepended to the flag name to create the viper key.
+// For example, if the config is found under the "cluster" section then we will
+// bind "cluster.host" to the flag "host". If the section is empty then the flag
+// name is used as the key.
+func BindPFlags(flags *pflag.FlagSet, section string) {
+	if section != "" {
+		section += "."
 	}
 
-	return nil
+	flags.VisitAll(func(f *pflag.Flag) {
+		// We need this to handle the "instance" flag. We will Bind the flags later
+		configToFlagMap[f.Name] = section + f.Name
+	})
+}
+
+// Reset resets the global configToFlagMap and viper instance.
+// Should be called before or after tests that use InitConfig or BindPFlags.
+// If using testify suites call it in the SetupTest function and or
+// SetupSubTests if using suite.T().Run(...).
+func Reset() {
+	configToFlagMap = map[string]string{}
+
+	viper.Reset()
+}
+
+func getAlias(key, instance string) string {
+	if instance != "" {
+		instance = "_" + instance
+	}
+
+	if k, ok := configToFlagMap[key]; ok {
+		key = k
+	}
+
+	keySplit := strings.SplitN(key, ".", 2)
+
+	if len(keySplit) == 1 {
+		return key
+	}
+
+	keySplit[0] += instance
+
+	return strings.Join(keySplit, ".")
 }

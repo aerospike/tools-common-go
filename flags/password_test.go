@@ -8,7 +8,6 @@ import (
 )
 
 func TestPassword(t *testing.T) {
-
 	envVar := "flag_test_password_env"
 	envVarVal := "birdistheword"
 	envVarB64 := "flag_test_password_envb64"
@@ -32,12 +31,14 @@ func TestPassword(t *testing.T) {
 	}
 
 	fpath := "./testdata/filedata"
+
 	fdata, err := os.ReadFile(fpath)
 	if err != nil {
 		t.Error(err.Error())
 	}
+
 	// trim the trailing new line to match readFromFile
-	fdata = []byte(bytes.TrimSuffix(fdata, []byte("\n")))
+	fdata = bytes.TrimSuffix(fdata, []byte("\n"))
 
 	testCases := []struct {
 		name    string
@@ -101,6 +102,5 @@ func TestPassword(t *testing.T) {
 				t.Errorf("flagFormatParser() = %v, want %v", string(actual), string(tc.output))
 			}
 		})
-
 	}
 }

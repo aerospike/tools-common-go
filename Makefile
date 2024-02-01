@@ -4,7 +4,9 @@ test:
 
 .PHONY: coverage
 coverage:
-	go test ./... -coverprofile coverage.cov -coverpkg ./... || true
+	go test ./... -coverprofile to_filter.cov -coverpkg ./... || true
+	grep -v "test_utils" to_filter.cov > coverage.cov
+	rm to_filter.cov || true
 	go tool cover -func coverage.cov
 
 .PHONY: clean

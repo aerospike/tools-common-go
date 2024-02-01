@@ -58,48 +58,21 @@ linters:
 run:
   issues-exit-code: 1
   go: '1.18'
-#  skip-dirs:
-#    - sample
-#  skip-files:
-#    - sample
 
 issues:
   exclude-rules:
     - path: '(.+)test\.go'
       linters:
-      - bodyclose
-  #    - unused # intentionally commented to avoid unused func warning as this repo is library
-      - depguard
-      - dogsled
+      - govet # Test code field alignment for sake of space is not a concern
       - dupl
-      - errcheck
-      - exportloopref
-      - exhaustive
+    - path: '(.+)test\.go'
+      text: importShadow
+    - path: 'example_test\.go'
+      linters:
       - goconst
-      - gocritic
-      - gofmt
-      - goimports
-      - gocyclo
-      - gosec
-      - gosimple
-      - govet
-      - ineffassign
-      - misspell
-      - nolintlint
-      - nakedret
-      - prealloc # pre-allocate slices with define size if the slice size is known in advance
-      - predeclared
-      - revive
-      - staticcheck
-      - stylecheck
-      - thelper
-      - tparallel
-      - typecheck
-      - unconvert
-      - unparam
-      - whitespace
+    - path: 'flags/cert_test\.go'
+      linters:
+      - goconst
+    - path: 'flags/utils_test\.go'
+      linters:
       - lll
-      - wsl # While space linter
-    - linters:
-        - lll
-      source: "// "

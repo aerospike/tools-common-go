@@ -7,7 +7,6 @@ import (
 )
 
 func Test_flagFormatParser(t *testing.T) {
-
 	envVar := "flag_test_parse_env"
 	envVarVal := "birdistheword"
 	envVarB64 := "flag_test_parse_envb64"
@@ -31,17 +30,20 @@ func Test_flagFormatParser(t *testing.T) {
 	}
 
 	fpath := "./testdata/filedata"
+
 	fdata, err := os.ReadFile(fpath)
 	if err != nil {
 		t.Error(err.Error())
 	}
+
 	// trim the trailing new line to match readFromFile
-	fdata = []byte(bytes.TrimSuffix(fdata, []byte("\n")))
+	fdata = bytes.TrimSuffix(fdata, []byte("\n"))
 
 	type args struct {
 		val  string
 		mode flagFormat
 	}
+
 	tests := []struct {
 		name    string
 		args    args
@@ -175,6 +177,7 @@ func Test_flagFormatParser(t *testing.T) {
 			wantErr: false,
 		},
 	}
+
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := flagFormatParser(tt.args.val, tt.args.mode)
