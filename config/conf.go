@@ -33,12 +33,16 @@ func InitConfig(cfgFile, instance string, flags *pflag.FlagSet) (string, error) 
 	if strings.HasSuffix(configFileUsed, ".conf") {
 		// If .conf then explicitly set type to toml.
 		viper.SetConfigType("toml")
+	}
 
-		if err := viper.ReadInConfig(); err != nil {
+	if err := viper.ReadInConfig(); err != nil {
+		if cfgFile != "" {
+			// User provided specific file, so we should return an error no
+			// matter what.
 			return "", fmt.Errorf("failed to read config file: %w", err)
-		}
-	} else {
-		if err := viper.ReadInConfig(); err != nil {
+		} else if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
+			// We are relying on the default config file destination. If the
+			// file is not found don't consider it an error.
 			return "", fmt.Errorf("failed to read config file: %w", err)
 		}
 	}
