@@ -16,7 +16,7 @@ import (
 //
 // Unique Data Agent
 // Version 1.2.3
-func SetupRoot(rootCmd *cobra.Command, appLongName string, version string) {
+func SetupRoot(rootCmd *cobra.Command, appLongName, version string) {
 	sVersion := strings.Split(version, "-")
 	build := ""
 
@@ -31,6 +31,7 @@ func SetupRoot(rootCmd *cobra.Command, appLongName string, version string) {
 		versionTemplate = fmt.Sprintf("%s\nVersion %s\nBuild %s\n", appLongName, version, build)
 	}
 
+	rootCmd.Version = version // Not used but needs to be defined for the version template to be displayed
 	rootCmd.PersistentFlags().BoolP("help", "u", false, "Display help information")
 	rootCmd.SetVersionTemplate(versionTemplate)
 	rootCmd.PersistentFlags().BoolP("version", "V", false, "Display version.") // All tools use -V
