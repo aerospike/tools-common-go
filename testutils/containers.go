@@ -18,12 +18,12 @@ import (
 	"github.com/docker/go-connections/nat"
 )
 
-var ClusterName = "mgmt-lib-test"
+var ClusterName = "tools-test"
 var PortStart = 10000
 var IP = "127.0.0.1"
 var WordDirAbs = "test/work"
 var Image = "aerospike/aerospike-server-enterprise:7.0.0.2"
-var ContainerPrefix = "aerospike_mgmt_lib_test_"
+var ContainerPrefix = "aerospike_tools_test_"
 var User = "admin"
 var Password = "admin"
 
@@ -33,8 +33,8 @@ security {
 
 service {
 	cluster-name %s
-	# Uncomment if multi-node EE tests are needed
-    # feature-key-file env-b64:FEATURES
+    # Will be replaced with "feature-key-file env-b64:FEATURES" if FEATKEY is set
+	{{.FeatureKeyFile}}
 	run-as-daemon false
 	proto-fd-max 1024
 	transaction-retry-ms 10000
@@ -170,9 +170,13 @@ func GetAerospikeContainerName(index int) string {
 	return ContainerPrefix + fmt.Sprintf("%d", index)
 }
 
-func createConfigFile(portBase int, accessAddress, peerConnection string) (string, error) {
+func createConfigFile(portBase int, accessAddress, peerConnection, featKey string) (string, error) {
+	if featKey != "" {
+		featKey = fmt.Sprintf("feature-key-file %s", featKey)
+	}
+
 	templateInput := struct {
-		FeaturePath    string
+		FeatureKeyFile string
 		AccessAddress  string
 		PeerConnection string
 		Namespace      string
@@ -181,8 +185,7 @@ func createConfigFile(portBase int, accessAddress, peerConnection string) (strin
 		FabricPort     int
 		InfoPort       int
 	}{
-		// Uncomment if multi-node EE tests are needed
-		// FeaturePath:    "/opt/aerospike/features.conf",
+		FeatureKeyFile: featKey,
 		AccessAddress:  accessAddress,
 		PeerConnection: peerConnection,
 		Namespace:      "test",
@@ -264,7 +267,13 @@ func RunAerospikeContainer(
 
 	log.Printf("Starting container %s", name)
 
-	confFile, err := createConfigFile(portBase, ip, peerConnection)
+	// Uncomment if multi-node EE tests are needed
+	featKey := os.Getenv("FEATKEY")
+	if featKey == "" {
+		log.Printf("FEATKEY is not set. Multi-node EE tests will not be run")
+	}
+
+	confFile, err := createConfigFile(portBase, ip, peerConnection, featKey)
 
 	if err != nil {
 		log.Printf("Unable to create config file for container %s: %s", name, err)
@@ -281,12 +290,6 @@ func RunAerospikeContainer(
 		containerConfFile,
 		"--instance",
 		fmt.Sprintf("%d", index),
-	}
-
-	// Uncomment if multi-node EE tests are needed
-	featKey := os.Getenv("FEATKEY")
-	if featKey == "" {
-		log.Printf("FEATKEY is not set. Multi-node EE tests will not be run")
 	}
 
 	ports := make([]string, 4)
