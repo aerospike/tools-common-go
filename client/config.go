@@ -6,7 +6,7 @@ import (
 	"encoding/pem"
 	"fmt"
 
-	as "github.com/aerospike/aerospike-client-go/v6"
+	as "github.com/aerospike/aerospike-client-go/v7"
 )
 
 // AerospikeConfig represents the intermediate configuration for an Aerospike

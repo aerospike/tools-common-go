@@ -3,7 +3,7 @@ module github.com/aerospike/tools-common-go
 go 1.20
 
 require (
-	github.com/aerospike/aerospike-client-go/v6 v6.14.1
+	github.com/aerospike/aerospike-client-go/v7 v7.1.0
 	github.com/docker/docker v25.0.3+incompatible
 	github.com/docker/go-connections v0.5.0
 	github.com/spf13/pflag v1.0.5
@@ -52,7 +52,7 @@ require (
 	github.com/spf13/cast v1.6.0 // indirect
 	github.com/spf13/cobra v1.8.0
 	github.com/subosito/gotenv v1.6.0 // indirect
-	github.com/yuin/gopher-lua v0.0.0-20200816102855-ee81675732da // indirect
+	github.com/yuin/gopher-lua v1.1.1 // indirect
 	go.uber.org/atomic v1.9.0 // indirect
 	go.uber.org/multierr v1.9.0 // indirect
 	golang.org/x/exp v0.0.0-20230905200255-921286631fa9 // indirect
