@@ -5,7 +5,7 @@ import (
 	"os"
 	"testing"
 
-	as "github.com/aerospike/aerospike-client-go/v6"
+	as "github.com/aerospike/aerospike-client-go/v7"
 	"github.com/aerospike/tools-common-go/client"
 	"github.com/stretchr/testify/suite"
 )
