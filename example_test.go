@@ -249,6 +249,10 @@ func (suite *ConfTestSuite) SetupSuite() {
 	suite.files = append(suite.files, []string{suite.certFile, suite.rootCAPath, suite.tmpDir}...)
 }
 
+func (suite *ConfTestSuite) SetupTest() {
+	config.Reset()
+}
+
 func (suite *ConfTestSuite) TearDownSuite() {
 	os.RemoveAll(suite.tmpDir)
 }
@@ -277,18 +281,14 @@ func (suite *ConfTestSuite) NewTestCmd() (*cobra.Command, *flags.ConfFileFlags, 
 	config.BindPFlags(asFlagSet, "cluster")
 
 	testCmd.PersistentFlags().AddFlagSet(asFlagSet)
-	flags.SetupRoot(testCmd, "Test App")
+	flags.SetupRoot(testCmd, "Test App", "1.1.1-9-g12345")
 
 	return testCmd, configFileFlags, aerospikeFlags
 }
 
-func (suite *ConfTestSuite) SetupTest() {
-	config.Reset()
-}
-
 func (suite *ConfTestSuite) TestSetupRootVersion() {
 	testCmd, _, _ := suite.NewTestCmd()
-	testCmd.Version = "1.1.1"
+	testCmd.Version = "1"
 	stdout := &bytes.Buffer{}
 
 	testCmd.SetArgs([]string{"--version"})
@@ -296,7 +296,7 @@ func (suite *ConfTestSuite) TestSetupRootVersion() {
 
 	suite.NoError(testCmd.Execute())
 
-	suite.Equal("Test App\nVersion 1.1.1\n", stdout.String())
+	suite.Equal("Test App\nVersion 1.1.1\nBuild g12345\n", stdout.String())
 
 	testCmd.SetArgs([]string{"-V"})
 
@@ -305,7 +305,7 @@ func (suite *ConfTestSuite) TestSetupRootVersion() {
 	testCmd.SetOut(stdout)
 	suite.NoError(testCmd.Execute())
 
-	suite.Equal("Test App\nVersion 1.1.1\n", stdout.String())
+	suite.Equal("Test App\nVersion 1.1.1\nBuild g12345\n", stdout.String())
 }
 
 func (suite *ConfTestSuite) TestSetupRootHelp() {
