@@ -33,7 +33,6 @@ func InitConfig(userProvidedCfgFile, instance string, flags *pflag.FlagSet) (str
 	}
 
 	if err := viper.ReadInConfig(); err != nil {
-		fmt.Println(err)
 		if userProvidedCfgFile != "" {
 			// User provided specific file, so we should return an error no
 			// matter what.
