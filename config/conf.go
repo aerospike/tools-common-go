@@ -42,6 +42,7 @@ func InitConfig(userProvidedCfgFile, instance string, flags *pflag.FlagSet) (str
 			// file is not found don't consider it an error.
 			viper.SetConfigName(AsToolsConfName + ".conf")
 			viper.SetConfigType("toml")
+
 			if err := viper.ReadInConfig(); err != nil {
 				return "", nil
 			}
