@@ -37,7 +37,6 @@ func InitConfig(userProvidedCfgFile, instance string, flags *pflag.FlagSet) (str
 		if userProvidedCfgFile != "" {
 			// User provided specific file, so we should return an error no
 			// matter what.
-			fmt.Println("1")
 			return "", fmt.Errorf("failed to read config file: %w", err)
 		} else if _, ok := err.(viper.ConfigFileNotFoundError); ok {
 			// We are relying on the default config file destination. If the
@@ -45,12 +44,9 @@ func InitConfig(userProvidedCfgFile, instance string, flags *pflag.FlagSet) (str
 			viper.SetConfigName(AsToolsConfName + ".conf")
 			viper.SetConfigType("toml")
 			if err := viper.ReadInConfig(); err != nil {
-				fmt.Println("2")
 				return "", nil
 			}
 		} else {
-
-			fmt.Println("3")
 			return "", fmt.Errorf("failed to read config file: %w", err)
 		}
 	}
