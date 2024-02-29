@@ -2,5 +2,5 @@ package config
 
 const (
 	AsToolsConfDir  = "/etc/aerospike"
-	AsToolsConfName = "astools.conf"
+	AsToolsConfName = "astools"
 )

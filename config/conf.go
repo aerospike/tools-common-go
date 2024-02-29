@@ -2,7 +2,6 @@ package config
 
 import (
 	"fmt"
-	"path"
 	"strings"
 
 	"github.com/spf13/pflag"
@@ -16,33 +15,38 @@ var configToFlagMap = map[string]string{}
 
 // InitConfig reads in config file and ENV variables if set. Should be called
 // from the root commands PersistentPreRunE function with the flags of the current command.
-func InitConfig(cfgFile, instance string, flags *pflag.FlagSet) (string, error) {
+func InitConfig(userProvidedCfgFile, instance string, flags *pflag.FlagSet) (string, error) {
 	configFileUsed := ""
 
-	if cfgFile != "" {
+	if userProvidedCfgFile != "" {
 		// Use config file from the flag.
-		viper.SetConfigFile(cfgFile)
-		configFileUsed = cfgFile
+		viper.SetConfigFile(userProvidedCfgFile)
+
+		if strings.HasSuffix(userProvidedCfgFile, ".conf") {
+			// If .conf then explicitly set type to toml.
+			viper.SetConfigType("toml")
+		}
 	} else {
 		viper.AddConfigPath(".")
 		viper.AddConfigPath(AsToolsConfDir)
 		viper.SetConfigName(AsToolsConfName)
-		configFileUsed = path.Join(AsToolsConfDir, AsToolsConfName)
-	}
-
-	if strings.HasSuffix(configFileUsed, ".conf") {
-		// If .conf then explicitly set type to toml.
-		viper.SetConfigType("toml")
 	}
 
 	if err := viper.ReadInConfig(); err != nil {
-		if cfgFile != "" {
+		if userProvidedCfgFile != "" {
 			// User provided specific file, so we should return an error no
 			// matter what.
 			return "", fmt.Errorf("failed to read config file: %w", err)
-		} else if _, ok := err.(viper.ConfigFileNotFoundError); !ok {
+		} else if _, ok := err.(viper.ConfigFileNotFoundError); ok {
 			// We are relying on the default config file destination. If the
 			// file is not found don't consider it an error.
+			viper.SetConfigName(AsToolsConfName + ".conf")
+			viper.SetConfigType("toml")
+
+			if err := viper.ReadInConfig(); err != nil {
+				return "", nil
+			}
+		} else {
 			return "", fmt.Errorf("failed to read config file: %w", err)
 		}
 	}
