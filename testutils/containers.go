@@ -225,7 +225,7 @@ func createConfigFile(portBase int, accessAddress, peerConnection, featKey strin
 
 func waitForASDToStart(name string) error {
 	startTime := time.Now()
-	timeout := 10 * time.Second
+	timeout := 20 * time.Second
 	policy := aerospike.NewClientPolicy()
 	policy.User = User
 	policy.Password = Password
