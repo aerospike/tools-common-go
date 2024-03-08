@@ -267,12 +267,14 @@ func RunAerospikeContainer(
 	cli := containers.dockerCLI
 
 	log.Printf("Starting container %s", name)
+
 	featKeyEnvVar := "FEATURES"
 
 	// Uncomment if multi-node EE tests are needed
 	featKey := os.Getenv("FEATKEY")
 	if featKey == "" {
 		featKeyEnvVar = ""
+
 		log.Printf("FEATKEY is not set. Multi-node EE tests will not be run")
 	}
 
