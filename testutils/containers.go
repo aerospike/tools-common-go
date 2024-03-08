@@ -172,7 +172,7 @@ func GetAerospikeContainerName(index int) string {
 
 func createConfigFile(portBase int, accessAddress, peerConnection, featKey string) (string, error) {
 	if featKey != "" {
-		featKey = fmt.Sprintf("feature-key-file %s", featKey)
+		featKey = fmt.Sprintf("feature-key-file env-b64:%s", featKey)
 	}
 
 	templateInput := struct {
