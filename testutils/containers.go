@@ -299,10 +299,10 @@ func RunAerospikeContainer(
 	}
 
 	config := container.Config{
-		Image:    Image,
-		Hostname: ip,
-		Cmd:      cmd,
-		Tty:      true,
+		Image: Image,
+		// Hostname: ip, # Use host network
+		Cmd: cmd,
+		Tty: true,
 		ExposedPorts: nat.PortSet{
 			nat.Port(ports[0]): {},
 			nat.Port(ports[1]): {},
