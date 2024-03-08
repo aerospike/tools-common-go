@@ -170,9 +170,10 @@ func GetAerospikeContainerName(index int) string {
 	return ContainerPrefix + fmt.Sprintf("%d", index)
 }
 
-func createConfigFile(portBase int, accessAddress, peerConnection, featKey string) (string, error) {
-	if featKey != "" {
-		featKey = fmt.Sprintf("feature-key-file env-b64:%s", featKey)
+func createConfigFile(portBase int, accessAddress, peerConnection, featKeyEnvVar string) (string, error) {
+	featKeyLine := ""
+	if featKeyEnvVar != "" {
+		featKeyLine = fmt.Sprintf("feature-key-file env-b64:%s", featKeyEnvVar)
 	}
 
 	templateInput := struct {
@@ -185,7 +186,7 @@ func createConfigFile(portBase int, accessAddress, peerConnection, featKey strin
 		FabricPort     int
 		InfoPort       int
 	}{
-		FeatureKeyFile: featKey,
+		FeatureKeyFile: featKeyLine,
 		AccessAddress:  accessAddress,
 		PeerConnection: peerConnection,
 		Namespace:      "test",
@@ -266,14 +267,16 @@ func RunAerospikeContainer(
 	cli := containers.dockerCLI
 
 	log.Printf("Starting container %s", name)
+	featKeyEnvVar := "FEATURES"
 
 	// Uncomment if multi-node EE tests are needed
 	featKey := os.Getenv("FEATKEY")
 	if featKey == "" {
+		featKeyEnvVar = ""
 		log.Printf("FEATKEY is not set. Multi-node EE tests will not be run")
 	}
 
-	confFile, err := createConfigFile(portBase, ip, peerConnection, featKey)
+	confFile, err := createConfigFile(portBase, ip, peerConnection, featKeyEnvVar)
 
 	if err != nil {
 		log.Printf("Unable to create config file for container %s: %s", name, err)
@@ -312,7 +315,7 @@ func RunAerospikeContainer(
 	}
 
 	if featKey != "" {
-		config.Env = append(config.Env, fmt.Sprintf("FEATURES=%s", featKey))
+		config.Env = append(config.Env, fmt.Sprintf("%s=%s", featKeyEnvVar, featKey))
 	}
 
 	if err != nil {
