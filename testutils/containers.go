@@ -11,8 +11,8 @@ import (
 	"time"
 
 	"github.com/aerospike/aerospike-client-go/v7"
-	"github.com/docker/docker/api/types"
 	"github.com/docker/docker/api/types/container"
+	"github.com/docker/docker/api/types/image"
 	"github.com/docker/docker/api/types/mount"
 	"github.com/docker/docker/client"
 	"github.com/docker/go-connections/nat"
@@ -105,7 +105,7 @@ func Start(size int) error {
 	ctx := context.Background()
 	containers.dockerCLI = cli
 	containers.workDir, _ = filepath.Abs(WordDirAbs)
-	reader, err := cli.ImagePull(ctx, Image, types.ImagePullOptions{})
+	reader, err := cli.ImagePull(ctx, Image, image.PullOptions{})
 
 	if err != nil {
 		log.Printf("Unable to pull aerospike image: %s", err)
