@@ -71,19 +71,22 @@ func (af *AerospikeFlags) NewAerospikeConfig() *client.AerospikeConfig {
 	aerospikeConf.AuthMode = as.AuthMode(af.AuthMode)
 
 	if af.TLSEnable {
-		aerospikeConf.Cert = af.TLSCertFile
-		aerospikeConf.Key = af.TLSKeyFile
-		aerospikeConf.KeyPass = af.TLSKeyFilePass
-		aerospikeConf.TLSProtocolsMinVersion = af.TLSProtocols.min
-		aerospikeConf.TLSProtocolsMaxVersion = af.TLSProtocols.max
-
-		aerospikeConf.RootCA = [][]byte{}
+		rootCA := [][]byte{}
 
 		if len(af.TLSRootCAFile) != 0 {
-			aerospikeConf.RootCA = append(aerospikeConf.RootCA, af.TLSRootCAFile)
+			rootCA = append(rootCA, af.TLSRootCAFile)
 		}
 
-		aerospikeConf.RootCA = append(aerospikeConf.RootCA, af.TLSRootCAPath...)
+		rootCA = append(rootCA, af.TLSRootCAPath...)
+
+		aerospikeConf.TLS = client.NewTLSConfig(
+			rootCA,
+			af.TLSCertFile,
+			af.TLSKeyFile,
+			af.TLSKeyFilePass,
+			af.TLSProtocols.min,
+			af.TLSProtocols.max,
+		)
 	}
 
 	for _, elem := range aerospikeConf.Seeds {

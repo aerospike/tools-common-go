@@ -67,6 +67,8 @@ issues:
       - dupl
     - path: '(.+)test\.go'
       text: importShadow
+    - path: '(.+)test\.go'
+      text: unused-parameter
     - path: 'example_test\.go'
       linters:
       - goconst

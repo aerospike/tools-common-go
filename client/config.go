@@ -12,17 +12,11 @@ import (
 // AerospikeConfig represents the intermediate configuration for an Aerospike
 // client. This can be constructed directly using flags.AerospikeFlags or
 type AerospikeConfig struct {
-	Seeds                  HostTLSPortSlice
-	User                   string
-	Password               string
-	AuthMode               as.AuthMode
-	RootCA                 [][]byte
-	Cert                   []byte
-	Key                    []byte
-	KeyPass                []byte
-	TLSProtocolsMinVersion TLSProtocol
-	TLSProtocolsMaxVersion TLSProtocol
-	// TLSCipherSuites        []uint16 // TODO
+	Seeds    HostTLSPortSlice
+	User     string
+	Password string
+	AuthMode as.AuthMode
+	TLS      *TLSConfig
 }
 
 // NewDefaultAerospikeConfig creates a new default AerospikeConfig instance.
@@ -41,12 +35,14 @@ func (ac *AerospikeConfig) NewClientPolicy() (*as.ClientPolicy, error) {
 	clientPolicy.Password = ac.Password
 	clientPolicy.AuthMode = ac.AuthMode
 
-	tlsConfig, err := ac.newTLSConfig()
-	if err != nil {
-		return nil, err
-	}
+	if ac.TLS != nil {
+		tlsConfig, err := ac.TLS.NewGoTLSConfig()
+		if err != nil {
+			return nil, err
+		}
 
-	clientPolicy.TlsConfig = tlsConfig
+		clientPolicy.TlsConfig = tlsConfig
+	}
 
 	return clientPolicy, nil
 }
@@ -67,8 +63,30 @@ func (ac *AerospikeConfig) NewHosts() []*as.Host {
 	return hosts
 }
 
-func (ac *AerospikeConfig) newTLSConfig() (*tls.Config, error) {
-	if len(ac.RootCA) == 0 && len(ac.Cert) == 0 && len(ac.Key) == 0 {
+type TLSConfig struct {
+	RootCA                 [][]byte
+	Cert                   []byte
+	Key                    []byte
+	KeyPass                []byte
+	TLSProtocolsMinVersion TLSProtocol
+	TLSProtocolsMaxVersion TLSProtocol
+	// TLSCipherSuites        []uint16 // TODO
+}
+
+//nolint:gocritic // Not sure why this is giving a builtinShadow error with min
+func NewTLSConfig(rootCA [][]byte, cert, key, keyPass []byte, min, max TLSProtocol) *TLSConfig {
+	return &TLSConfig{
+		RootCA:                 rootCA,
+		Cert:                   cert,
+		Key:                    key,
+		KeyPass:                keyPass,
+		TLSProtocolsMinVersion: min,
+		TLSProtocolsMaxVersion: max,
+	}
+}
+
+func (tc *TLSConfig) NewGoTLSConfig() (*tls.Config, error) {
+	if tc.RootCA == nil && tc.Cert == nil && tc.Key == nil {
 		return nil, nil
 	}
 
@@ -78,10 +96,10 @@ func (ac *AerospikeConfig) newTLSConfig() (*tls.Config, error) {
 		err        error
 	)
 
-	serverPool = loadCACerts(ac.RootCA)
+	serverPool = loadCACerts(tc.RootCA)
 
-	if len(ac.Cert) > 0 || len(ac.Key) > 0 {
-		clientPool, err = loadServerCertAndKey(ac.Cert, ac.Key, ac.KeyPass)
+	if len(tc.Cert) > 0 || len(tc.Key) > 0 {
+		clientPool, err = loadServerCertAndKey(tc.Cert, tc.Key, tc.KeyPass)
 		if err != nil {
 			return nil, fmt.Errorf("failed to load client authentication certificate and key `%s`", err)
 		}
@@ -92,8 +110,8 @@ func (ac *AerospikeConfig) newTLSConfig() (*tls.Config, error) {
 		RootCAs:                  serverPool,
 		InsecureSkipVerify:       false,
 		PreferServerCipherSuites: true,
-		MinVersion:               uint16(ac.TLSProtocolsMinVersion),
-		MaxVersion:               uint16(ac.TLSProtocolsMaxVersion),
+		MinVersion:               uint16(tc.TLSProtocolsMinVersion),
+		MaxVersion:               uint16(tc.TLSProtocolsMaxVersion),
 	}
 
 	return tlsConfig, nil

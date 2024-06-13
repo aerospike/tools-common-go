@@ -44,7 +44,7 @@ func (suite *UtilsTestSuite) TestWrapString() {
 	}
 
 	for _, tc := range testCases {
-		suite.T().Run("", func(t *testing.T) {
+		suite.T().Run("", func(_ *testing.T) {
 			actual := WrapString(tc.input, tc.lineLen)
 			suite.Equal(tc.expected, actual)
 		})
@@ -71,7 +71,7 @@ func (suite *UtilsTestSuite) TestDefaultWrapHelpString() {
 	}
 
 	for _, tc := range testCases {
-		suite.T().Run("", func(t *testing.T) {
+		suite.T().Run("", func(_ *testing.T) {
 			actual := DefaultWrapHelpString(tc.input)
 			suite.Equal(tc.expected, actual)
 		})

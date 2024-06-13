@@ -44,7 +44,7 @@ func (suite *AuthModeTestSuite) TestAuthModeFlag() {
 	}
 
 	for _, tc := range testCases {
-		suite.T().Run(tc.input, func(t *testing.T) {
+		suite.T().Run(tc.input, func(_ *testing.T) {
 			var actual AuthModeFlag
 
 			suite.NoError(actual.Set(tc.input))

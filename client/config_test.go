@@ -75,29 +75,25 @@ func TestAerospikeConfig_NewHosts(t *testing.T) {
 }
 
 func TestAerospikeConfig_NewTLSConfig(t *testing.T) {
-	emptyConfig := &AerospikeConfig{}
-
-	nilTLSConfig, _ := emptyConfig.newTLSConfig()
-	if nilTLSConfig != nil {
-		t.Errorf("NewTLSConfig() should return nil when config is empty")
-	}
-
 	rootCA, _ := testutils.GenerateCert()
 	cert, _ := testutils.GenerateCert()
 
 	config := &AerospikeConfig{
-		RootCA:                 [][]byte{rootCA},
-		Cert:                   cert,
-		Key:                    testutils.KeyFileBytes,
-		KeyPass:                []byte("fakepassphrase"),
-		TLSProtocolsMinVersion: 1,
-		TLSProtocolsMaxVersion: 3,
+		TLS: &TLSConfig{
+
+			RootCA:                 [][]byte{rootCA},
+			Cert:                   cert,
+			Key:                    testutils.KeyFileBytes,
+			KeyPass:                []byte("fakepassphrase"),
+			TLSProtocolsMinVersion: 1,
+			TLSProtocolsMaxVersion: 3,
+		},
 	}
 	expectedServerPool, _ := x509.SystemCertPool()
-	expectedServerPool.AppendCertsFromPEM(config.RootCA[0])
-	expectedClientPool, _ := loadServerCertAndKey(config.Cert, config.Key, config.KeyPass)
+	expectedServerPool.AppendCertsFromPEM(config.TLS.RootCA[0])
+	expectedClientPool, _ := loadServerCertAndKey(config.TLS.Cert, config.TLS.Key, config.TLS.KeyPass)
 
-	tlsConfig, err := config.newTLSConfig()
+	tlsConfig, err := config.TLS.NewGoTLSConfig()
 	if err != nil {
 		t.Errorf("NewTLSConfig() returned an unexpected error: %v", err)
 	}
@@ -121,19 +117,19 @@ func TestAerospikeConfig_NewTLSConfig(t *testing.T) {
 		t.Errorf("NewTLSConfig() should have InsecureSkipVerify set to false")
 	}
 
-	if tlsConfig.MinVersion != uint16(config.TLSProtocolsMinVersion) {
+	if tlsConfig.MinVersion != uint16(config.TLS.TLSProtocolsMinVersion) {
 		t.Errorf(
 			"NewTLSConfig() returned incorrect MinVersion, got %v, want %v",
 			tlsConfig.MinVersion,
-			config.TLSProtocolsMinVersion,
+			config.TLS.TLSProtocolsMinVersion,
 		)
 	}
 
-	if tlsConfig.MaxVersion != uint16(config.TLSProtocolsMaxVersion) {
+	if tlsConfig.MaxVersion != uint16(config.TLS.TLSProtocolsMaxVersion) {
 		t.Errorf(
 			"NewTLSConfig() returned incorrect MaxVersion, got %v, want %v",
 			tlsConfig.MaxVersion,
-			config.TLSProtocolsMaxVersion,
+			config.TLS.TLSProtocolsMaxVersion,
 		)
 	}
 }

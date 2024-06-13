@@ -181,10 +181,12 @@ func Test_flagFormatParser(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			got, err := flagFormatParser(tt.args.val, tt.args.mode)
+
 			if (err != nil) != tt.wantErr {
 				t.Errorf("flagFormatParser() error = %v, wantErr %v", err, tt.wantErr)
 				return
 			}
+
 			if got != tt.want {
 				t.Errorf("flagFormatParser() = %v, want %v", got, tt.want)
 			}

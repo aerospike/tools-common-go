@@ -94,10 +94,12 @@ func TestCert(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			actual := CertFlag{}
 			err := actual.Set(tc.input)
+
 			if (err != nil) != tc.wantErr {
 				t.Errorf("flagFormatParser() error = %v, wantErr %v", err, tc.wantErr)
 				return
 			}
+
 			if !reflect.DeepEqual(actual, tc.output) {
 				t.Errorf("flagFormatParser() = %v, want %v", actual, tc.output)
 			}
@@ -131,10 +133,12 @@ func TestCertPath(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			actual := CertPathFlag{}
 			err := actual.Set(tc.input)
+
 			if (err != nil) != tc.wantErr {
 				t.Errorf("flagFormatParser() error = %v, wantErr %v", err, tc.wantErr)
 				return
 			}
+
 			if !reflect.DeepEqual(actual, tc.output) {
 				t.Errorf("flagFormatParser() = %v, want %v", actual, tc.output)
 			}

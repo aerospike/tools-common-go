@@ -93,9 +93,10 @@ func (suite *FlagsTestSuite) TestTLSProtocolsFlag() {
 	}
 
 	for _, tc := range testCases {
-		suite.T().Run(tc.input, func(t *testing.T) {
+		suite.T().Run(tc.input, func(_ *testing.T) {
 			var actual TLSProtocolsFlag
 			err := actual.Set(tc.input)
+
 			if tc.err {
 				suite.Error(err)
 			} else {
