@@ -84,8 +84,8 @@ func (af *AerospikeFlags) NewAerospikeConfig() *client.AerospikeConfig {
 			af.TLSCertFile,
 			af.TLSKeyFile,
 			af.TLSKeyFilePass,
-			af.TLSProtocols.min,
-			af.TLSProtocols.max,
+			af.TLSProtocols.Min,
+			af.TLSProtocols.Max,
 		)
 	}
 

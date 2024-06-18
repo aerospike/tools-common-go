@@ -58,7 +58,7 @@ func NewTLSConfig(rootCA [][]byte, cert, key, keyPass []byte, min, max TLSProtoc
 }
 
 func (tc *TLSConfig) NewGoTLSConfig() (*tls.Config, error) {
-	if tc.RootCA == nil && tc.Cert == nil && tc.Key == nil {
+	if len(tc.RootCA) == 0 && len(tc.Cert) == 0 && len(tc.Key) == 0 {
 		return nil, nil
 	}
 
