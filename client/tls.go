@@ -68,10 +68,10 @@ func (tc *TLSConfig) NewGoTLSConfig() (*tls.Config, error) {
 		err        error
 	)
 
-	serverPool = loadCACerts(tc.RootCA)
+	serverPool = LoadCACerts(tc.RootCA)
 
 	if len(tc.Cert) > 0 || len(tc.Key) > 0 {
-		clientPool, err = loadServerCertAndKey(tc.Cert, tc.Key, tc.KeyPass)
+		clientPool, err = LoadServerCertAndKey(tc.Cert, tc.Key, tc.KeyPass)
 		if err != nil {
 			return nil, fmt.Errorf("failed to load client authentication certificate and key `%s`", err)
 		}
@@ -89,9 +89,9 @@ func (tc *TLSConfig) NewGoTLSConfig() (*tls.Config, error) {
 	return tlsConfig, nil
 }
 
-// loadCACerts returns CA set of certificates (cert pool)
+// LoadCACerts returns CA set of certificates (cert pool)
 // reads CA certificate based on the certConfig and adds it to the pool
-func loadCACerts(certsBytes [][]byte) *x509.CertPool {
+func LoadCACerts(certsBytes [][]byte) *x509.CertPool {
 	certificates, err := x509.SystemCertPool()
 	if certificates == nil || err != nil {
 		certificates = x509.NewCertPool()
@@ -106,10 +106,10 @@ func loadCACerts(certsBytes [][]byte) *x509.CertPool {
 	return certificates
 }
 
-// loadServerCertAndKey reads server certificate and associated key file based on certConfig and keyConfig
+// LoadServerCertAndKey reads server certificate and associated key file based on certConfig and keyConfig
 // returns parsed server certificate
 // if the private key is encrypted, it will be decrypted using key file passphrase
-func loadServerCertAndKey(certFileBytes, keyFileBytes, keyPassBytes []byte) ([]tls.Certificate, error) {
+func LoadServerCertAndKey(certFileBytes, keyFileBytes, keyPassBytes []byte) ([]tls.Certificate, error) {
 	var certificates []tls.Certificate
 
 	// Decode PEM data

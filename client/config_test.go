@@ -91,7 +91,7 @@ func TestAerospikeConfig_NewTLSConfig(t *testing.T) {
 	}
 	expectedServerPool, _ := x509.SystemCertPool()
 	expectedServerPool.AppendCertsFromPEM(config.TLS.RootCA[0])
-	expectedClientPool, _ := loadServerCertAndKey(config.TLS.Cert, config.TLS.Key, config.TLS.KeyPass)
+	expectedClientPool, _ := LoadServerCertAndKey(config.TLS.Cert, config.TLS.Key, config.TLS.KeyPass)
 
 	tlsConfig, err := config.TLS.NewGoTLSConfig()
 	if err != nil {
@@ -197,7 +197,7 @@ func TestLoadServerCertAndKey(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			actualOutput, actualError := loadServerCertAndKey(
+			actualOutput, actualError := LoadServerCertAndKey(
 				tc.certFileBytes,
 				tc.keyFileBytes,
 				tc.keyPassBytes,
@@ -270,7 +270,7 @@ func TestLoadCACerts(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			actualOutput := loadCACerts(tc.certsBytes)
+			actualOutput := LoadCACerts(tc.certsBytes)
 
 			if !reflect.DeepEqual(actualOutput, tc.expectedOutput) {
 				t.Errorf("loadCACerts() output = %v, want %v", actualOutput, tc.expectedOutput)
