@@ -5,7 +5,7 @@ go 1.21
 toolchain go1.21.7
 
 require (
-	github.com/aerospike/aerospike-client-go/v7 v7.2.1
+	github.com/aerospike/aerospike-client-go/v7 v7.5.0
 	github.com/docker/docker v26.1.0+incompatible
 	github.com/docker/go-connections v0.5.0
 	github.com/spf13/pflag v1.0.5
