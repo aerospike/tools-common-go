@@ -11,7 +11,7 @@ linters-settings:
       - performance
       - style
   govet:
-    check-shadowing: true
+    shadow: true
     enable:
       - fieldalignment
   nolintlint:
@@ -67,6 +67,8 @@ issues:
       - dupl
     - path: '(.+)test\.go'
       text: importShadow
+    - path: '(.+)test\.go'
+      text: unused-parameter
     - path: 'example_test\.go'
       linters:
       - goconst

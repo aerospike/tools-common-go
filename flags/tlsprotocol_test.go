@@ -21,81 +21,82 @@ func (suite *FlagsTestSuite) TestTLSProtocolsFlag() {
 		{
 			"",
 			TLSProtocolsFlag{
-				min: client.VersionTLSDefaultMin,
-				max: client.VersionTLSDefaultMax,
+				Min: client.VersionTLSDefaultMin,
+				Max: client.VersionTLSDefaultMax,
 			},
 			false,
 		},
 		{
 			"all",
 			TLSProtocolsFlag{
-				min: tls.VersionTLS10,
-				max: tls.VersionTLS13,
+				Min: tls.VersionTLS10,
+				Max: tls.VersionTLS13,
 			},
 			false,
 		},
 		{
 			"all -TLSv1",
 			TLSProtocolsFlag{
-				min: tls.VersionTLS11,
-				max: tls.VersionTLS13,
+				Min: tls.VersionTLS11,
+				Max: tls.VersionTLS13,
 			},
 			false,
 		},
 		{
 			"all -TLSv1.2",
 			TLSProtocolsFlag{
-				min: tls.VersionTLS10,
-				max: tls.VersionTLS13,
+				Min: tls.VersionTLS10,
+				Max: tls.VersionTLS13,
 			},
 			false,
 		},
 		{
 			"+TLSv1",
 			TLSProtocolsFlag{
-				min: tls.VersionTLS10,
-				max: tls.VersionTLS10,
+				Min: tls.VersionTLS10,
+				Max: tls.VersionTLS10,
 			},
 			false,
 		},
 		{
 			"+TLSv1.1",
 			TLSProtocolsFlag{
-				min: tls.VersionTLS11,
-				max: tls.VersionTLS11,
+				Min: tls.VersionTLS11,
+				Max: tls.VersionTLS11,
 			},
 			false,
 		},
 		{
 			"+TLSv1.2",
 			TLSProtocolsFlag{
-				min: tls.VersionTLS12,
-				max: tls.VersionTLS12,
+				Min: tls.VersionTLS12,
+				Max: tls.VersionTLS12,
 			},
 			false,
 		},
 		{
 			"+TLSv1.3",
 			TLSProtocolsFlag{
-				min: tls.VersionTLS13,
-				max: tls.VersionTLS13,
+				Min: tls.VersionTLS13,
+				Max: tls.VersionTLS13,
 			},
 			false,
 		},
 		{
 			"all -TLSv1.1",
 			TLSProtocolsFlag{
-				min: tls.VersionTLS12,
-				max: tls.VersionTLS13,
+				Min: tls.VersionTLS12,
+				Max: tls.VersionTLS13,
 			},
 			true,
 		},
 	}
 
 	for _, tc := range testCases {
-		suite.T().Run(tc.input, func(t *testing.T) {
+		suite.T().Run(tc.input, func(_ *testing.T) {
 			var actual TLSProtocolsFlag
 			err := actual.Set(tc.input)
+
 			if tc.err {
 				suite.Error(err)
 			} else {

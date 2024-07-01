@@ -13,14 +13,14 @@ import (
 // Example flags include.
 // --tls--protocols
 type TLSProtocolsFlag struct {
-	min client.TLSProtocol
-	max client.TLSProtocol
+	Min client.TLSProtocol
+	Max client.TLSProtocol
 }
 
 func NewDefaultTLSProtocolsFlag() TLSProtocolsFlag {
 	return TLSProtocolsFlag{
-		min: client.VersionTLSDefaultMin,
-		max: client.VersionTLSDefaultMax,
+		Min: client.VersionTLSDefaultMin,
+		Max: client.VersionTLSDefaultMax,
 	}
 }
 
@@ -89,8 +89,8 @@ func (flag *TLSProtocolsFlag) Set(val string) error {
 	}
 
 	if protocols == tlsAll {
-		flag.min = tls.VersionTLS10
-		flag.max = tls.VersionTLS13
+		flag.Min = tls.VersionTLS10
+		flag.Max = tls.VersionTLS13
 
 		return nil
 	}
@@ -102,7 +102,7 @@ func (flag *TLSProtocolsFlag) Set(val string) error {
 
 	for i, p := range protocolSlice {
 		if protocols&(1<<i) != 0 {
-			flag.min = p
+			flag.Min = p
 			break
 		}
 	}
@@ -110,7 +110,7 @@ func (flag *TLSProtocolsFlag) Set(val string) error {
 	for i := 0; i < len(protocolSlice); i++ {
 		p := protocolSlice[len(protocolSlice)-1-i]
 		if protocols&((1<<(len(protocolSlice)-1))>>i) != 0 {
-			flag.max = p
+			flag.Max = p
 			break
 		}
 	}
@@ -123,11 +123,11 @@ func (flag *TLSProtocolsFlag) Type() string {
 }
 
 func (flag *TLSProtocolsFlag) String() string {
-	if flag.min == flag.max {
-		return strings.Replace(flag.max.String(), "V", "v", 1)
+	if flag.Min == flag.Max {
+		return strings.Replace(flag.Max.String(), "V", "v", 1)
 	}
 
-	if flag.min == tls.VersionTLS10 && flag.max == tls.VersionTLS13 {
+	if flag.Min == tls.VersionTLS10 && flag.Max == tls.VersionTLS13 {
 		return "all"
 	}
 
@@ -142,11 +142,11 @@ func (flag *TLSProtocolsFlag) String() string {
 	on := false
 
 	for _, p := range protocolSlice {
-		if p == flag.min {
+		if p == flag.Min {
 			on = true
 		}
 
-		if p == flag.max {
+		if p == flag.Max {
 			break
 		}
 

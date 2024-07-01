@@ -80,7 +80,7 @@ func (suite *ConfigTestSuite) SetupTest() {
 func (suite *ConfigTestSuite) NewCmds(file, instance string) (rootCmd, cmd1, cmd2 *cobra.Command) {
 	rootCmd = &cobra.Command{
 		Use: "test",
-		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
+		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
 			cfgFileTmp, err := InitConfig(file, instance, cmd.Flags())
 			if err != nil {
 				return fmt.Errorf("Failed to initialize config: %s", err)
@@ -94,13 +94,13 @@ func (suite *ConfigTestSuite) NewCmds(file, instance string) (rootCmd, cmd1, cmd
 
 	cmd1 = &cobra.Command{
 		Use: "test1",
-		Run: func(cmd *cobra.Command, args []string) {
+		Run: func(_ *cobra.Command, _ []string) {
 		},
 	}
 
 	cmd2 = &cobra.Command{
 		Use: "test2",
-		Run: func(cmd *cobra.Command, args []string) {
+		Run: func(_ *cobra.Command, _ []string) {
 		},
 	}
 
