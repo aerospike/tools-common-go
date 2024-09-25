@@ -1,6 +1,6 @@
 package config
 
 const (
-	AsToolsConfDir  = "/etc/aerospike"
-	AsToolsConfName = "astools"
+	DefaultConfDir  = "/etc/aerospike"
+	DefaultConfName = "astools"
 )
