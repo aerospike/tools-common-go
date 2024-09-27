@@ -18,19 +18,19 @@ var confName = DefaultConfName
 // SetConfDirs sets the directories to search for the config file when a file
 // name is not explicitly provided. If a file name is explicitly provided viper
 // checks both relative and absolute file paths.
-func SetConfDirs(dirs []string) {
+func SetDefaultConfDirs(dirs []string) {
 	confDirs = dirs
 }
 
 // SetConfName sets the name of the config file to search for. For aerospike
 // tools this is astools but for asvec it is asvec.
-func SetConfName(name string) {
+func SetDefaultConfName(name string) {
 	confName = name
 }
 
 // InitConfig reads in config file and ENV variables if set. Should be called
 // from the root commands PersistentPreRunE function with the flags of the current command.
-func InitConfig(userProvidedCfgFile string) (string, error) {
+func InitConfig(userProvidedCfgFile, instance string, flags *pflag.FlagSet) (string, error) {
 	if userProvidedCfgFile != "" {
 		// Use config file from the flag.
 		viper.SetConfigFile(userProvidedCfgFile)
@@ -66,7 +66,7 @@ func InitConfig(userProvidedCfgFile string) (string, error) {
 		}
 	}
 
-	return viper.ConfigFileUsed(), nil
+	return viper.ConfigFileUsed(), SetFlags(instance, flags)
 }
 
 func SetFlags(instance string, flags *pflag.FlagSet) error {

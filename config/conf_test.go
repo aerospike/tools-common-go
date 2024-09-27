@@ -81,14 +81,9 @@ func (suite *ConfigTestSuite) NewCmds(file, instance string) (rootCmd, cmd1, cmd
 	rootCmd = &cobra.Command{
 		Use: "test",
 		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
-			cfgFileTmp, err := InitConfig(file)
+			cfgFileTmp, err := InitConfig(file, instance, cmd.Flags())
 			if err != nil {
 				return fmt.Errorf("Failed to initialize config: %s", err)
-			}
-
-			err = SetFlags(instance, cmd.Flags())
-			if err != nil {
-				return fmt.Errorf("Failed to set flags: %s", err)
 			}
 
 			suite.actualCfgFile = cfgFileTmp

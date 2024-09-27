@@ -265,14 +265,9 @@ func (suite *ConfTestSuite) NewTestCmd() (*cobra.Command, *flags.ConfFileFlags, 
 		Use:   "test",
 		Short: "test cmd",
 		Run: func(cmd *cobra.Command, _ []string) {
-			_, err := config.InitConfig(configFileFlags.File)
+			_, err := config.InitConfig(configFileFlags.File, configFileFlags.Instance, cmd.Flags())
 			if err != nil {
 				suite.FailNow("Failed to initialize config", err)
-			}
-
-			err = config.SetFlags(configFileFlags.Instance, cmd.Flags())
-			if err != nil {
-				suite.FailNow("Failed to set flags", err)
 			}
 		},
 	}
