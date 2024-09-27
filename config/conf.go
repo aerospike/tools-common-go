@@ -136,7 +136,11 @@ func getAlias(key, instance string) string {
 	keySplit := strings.SplitN(key, ".", 2)
 
 	if len(keySplit) == 1 {
-		return instance + "." + key
+		if instance != "" {
+			return instance + "." + key
+		}
+
+		return key
 	}
 
 	if instance != "" {
