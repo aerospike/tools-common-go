@@ -12,12 +12,25 @@ import (
 // This is only needed because if "instance". Otherwise we would just run
 // RegisterAlias inside the BindPFlags function.
 var configToFlagMap = map[string]string{}
+var confDirs = []string{".", DefaultConfDir}
+var confName = DefaultConfName
+
+// SetConfDirs sets the directories to search for the config file when a file
+// name is not explicitly provided. If a file name is explicitly provided viper
+// checks both relative and absolute file paths.
+func SetDefaultConfDirs(dirs []string) {
+	confDirs = dirs
+}
+
+// SetConfName sets the name of the config file to search for. For aerospike
+// tools this is astools but for asvec it is asvec.
+func SetDefaultConfName(name string) {
+	confName = name
+}
 
 // InitConfig reads in config file and ENV variables if set. Should be called
 // from the root commands PersistentPreRunE function with the flags of the current command.
 func InitConfig(userProvidedCfgFile, instance string, flags *pflag.FlagSet) (string, error) {
-	configFileUsed := ""
-
 	if userProvidedCfgFile != "" {
 		// Use config file from the flag.
 		viper.SetConfigFile(userProvidedCfgFile)
@@ -27,9 +40,11 @@ func InitConfig(userProvidedCfgFile, instance string, flags *pflag.FlagSet) (str
 			viper.SetConfigType("toml")
 		}
 	} else {
-		viper.AddConfigPath(".")
-		viper.AddConfigPath(AsToolsConfDir)
-		viper.SetConfigName(AsToolsConfName)
+		for _, d := range confDirs {
+			viper.AddConfigPath(d)
+		}
+
+		viper.SetConfigName(confName)
 	}
 
 	if err := viper.ReadInConfig(); err != nil {
@@ -40,7 +55,7 @@ func InitConfig(userProvidedCfgFile, instance string, flags *pflag.FlagSet) (str
 		} else if _, ok := err.(viper.ConfigFileNotFoundError); ok {
 			// We are relying on the default config file destination. If the
 			// file is not found don't consider it an error.
-			viper.SetConfigName(AsToolsConfName + ".conf")
+			viper.SetConfigName(confName + ".conf")
 			viper.SetConfigType("toml")
 
 			if err := viper.ReadInConfig(); err != nil {
@@ -51,12 +66,10 @@ func InitConfig(userProvidedCfgFile, instance string, flags *pflag.FlagSet) (str
 		}
 	}
 
-	configFileUsed = viper.ConfigFileUsed()
+	return viper.ConfigFileUsed(), SetFlags(instance, flags)
+}
 
-	if configFileUsed == "" {
-		return "", nil
-	}
-
+func SetFlags(instance string, flags *pflag.FlagSet) error {
 	var persistedErr error
 
 	flags.VisitAll(func(f *pflag.Flag) {
@@ -86,7 +99,7 @@ func InitConfig(userProvidedCfgFile, instance string, flags *pflag.FlagSet) (str
 		}
 	})
 
-	return configFileUsed, persistedErr
+	return persistedErr
 }
 
 // BindPFlags binds the flags to viper. Should be called after the flag set is
@@ -116,10 +129,6 @@ func Reset() {
 }
 
 func getAlias(key, instance string) string {
-	if instance != "" {
-		instance = "_" + instance
-	}
-
 	if k, ok := configToFlagMap[key]; ok {
 		key = k
 	}
@@ -127,10 +136,16 @@ func getAlias(key, instance string) string {
 	keySplit := strings.SplitN(key, ".", 2)
 
 	if len(keySplit) == 1 {
+		if instance != "" {
+			return instance + "." + key
+		}
+
 		return key
 	}
 
-	keySplit[0] += instance
+	if instance != "" {
+		keySplit[0] += "_" + instance
+	}
 
 	return strings.Join(keySplit, ".")
 }

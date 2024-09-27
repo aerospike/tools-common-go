@@ -252,6 +252,42 @@ func (suite *ConfigTestSuite) TestInitConfigWithInstance() {
 	suite.Equal(suite.actualCfgFile, suite.file)
 }
 
+// This is used by asvec. Instead of having a group like cluster,asadm,aql etc.
+// and adding and _{instance} to the group to select config params it uses and
+// empty group and uses then instance arg as the group name. Affectively
+// allowing the user to define the full group name at runtime.
+func (suite *ConfigTestSuite) TestInitConfigWithoutGroupsButWithInstance() {
+	rootCmd, cmd1, _ := suite.NewCmds(suite.file, "group1")
+
+	flagSet := &pflag.FlagSet{}
+	flagSet.String("str", "", "string flag")
+	flagSet.Int("int", 0, "int flag")
+	flagSet.Bool("bool", false, "bool flag")
+	BindPFlags(flagSet, "")
+
+	cmd1.Flags().AddFlagSet(flagSet)
+
+	// Cmd1
+	rootCmd.SetArgs([]string{"test1"})
+	err := rootCmd.Execute()
+
+	suite.NoError(err)
+
+	str, err := cmd1.Flags().GetString("str")
+	suite.NoError(err)
+	suite.Equal("localhost:3000", str)
+
+	intVal, err := cmd1.Flags().GetInt("int")
+	suite.NoError(err)
+	suite.Equal(3000, intVal)
+
+	boolVal, err := cmd1.Flags().GetBool("bool")
+	suite.NoError(err)
+	suite.Equal(true, boolVal)
+
+	suite.Equal(suite.actualCfgFile, suite.file)
+}
+
 func (suite *ConfigTestSuite) TestInitConfigWithFlagsOverwrite() {
 	rootCmd, cmd1, _ := suite.NewCmds(suite.file, "")
 
