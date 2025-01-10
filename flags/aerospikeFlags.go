@@ -32,7 +32,7 @@ func NewDefaultAerospikeFlags() *AerospikeFlags {
 	}
 }
 
-// NewAerospikeFlagSet returns a new pflag.FlagSet with Aerospike flags defined.
+// NewFlagSet returns a new pflag.FlagSet with Aerospike flags defined.
 // Values set in the returned FlagSet will be stored in the AerospikeFlags argument.
 func (af *AerospikeFlags) NewFlagSet(fmtUsage UsageFormatter) *pflag.FlagSet {
 	f := &pflag.FlagSet{}
@@ -43,9 +43,9 @@ func (af *AerospikeFlags) NewFlagSet(fmtUsage UsageFormatter) *pflag.FlagSet {
 	f.Var(&af.AuthMode, "auth", fmtUsage("The authentication mode used by the Aerospike server."+
 		" INTERNAL uses standard user/pass. EXTERNAL uses external methods (like LDAP)"+
 		" which are configured on the server. EXTERNAL requires TLS. PKI allows TLS"+
-		" authentication and authorization based on a certificate. No user name needs to be configured."))
+		" authentication and authorization based on a certificate. No username needs to be configured."))
 	f.BoolVar(&af.TLSEnable, "tls-enable", false, fmtUsage("Enable TLS authentication with Aerospike."+
-		" If false, other tls options are ignored.",
+		" If false, other TLS options are ignored.",
 	))
 	f.StringVar(&af.TLSName, "tls-name", "", fmtUsage("The server TLS context to use to"+
 		" authenticate the connection to Aerospike.",
@@ -54,7 +54,7 @@ func (af *AerospikeFlags) NewFlagSet(fmtUsage UsageFormatter) *pflag.FlagSet {
 	f.Var(&af.TLSRootCAPath, "tls-capath", fmtUsage("A path containing CAs for connecting to Aerospike."))
 	f.Var(&af.TLSCertFile, "tls-certfile", fmtUsage("The certificate file for mutual TLS authentication with Aerospike."))
 	f.Var(&af.TLSKeyFile, "tls-keyfile", fmtUsage("The key file used for mutual TLS authentication with Aerospike."))
-	f.Var(&af.TLSKeyFilePass, "tls-keyfile-password", fmtUsage("The password used to decrypt the key-file if encrypted."))
+	f.Var(&af.TLSKeyFilePass, "tls-keyfile-password", fmtUsage("The password used to decrypt the key file if encrypted."))
 	f.Var(&af.TLSProtocols, "tls-protocols", fmtUsage(
 		"Set the TLS protocol selection criteria. This format is the same as"+
 			" Apache's SSLProtocol documented at https://httpd.apache.org/docs/current/mod/mod_ssl.html#ssl protocol.",
