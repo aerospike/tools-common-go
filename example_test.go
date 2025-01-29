@@ -12,7 +12,7 @@ import (
 	"testing"
 	"text/template"
 
-	as "github.com/aerospike/aerospike-client-go/v7"
+	as "github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/tools-common-go/config"
 	"github.com/aerospike/tools-common-go/flags"
 	"github.com/aerospike/tools-common-go/testutils"

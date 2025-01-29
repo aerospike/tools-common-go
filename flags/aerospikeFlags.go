@@ -1,7 +1,7 @@
 package flags
 
 import (
-	as "github.com/aerospike/aerospike-client-go/v7"
+	as "github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/tools-common-go/client"
 	"github.com/spf13/pflag"
 )
