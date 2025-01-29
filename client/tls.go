@@ -44,16 +44,14 @@ type TLSConfig struct {
 // NewTLSConfig returns a new TLSConfig that can later be used to create a
 // tls.Config that can be passed to a go client. It is a intermediate type that
 // integrates nicely with our flags.
-//
-//nolint:gocritic // Not sure why this is giving a builtinShadow error with min
-func NewTLSConfig(rootCA [][]byte, cert, key, keyPass []byte, min, max TLSProtocol) *TLSConfig {
+func NewTLSConfig(rootCA [][]byte, cert, key, keyPass []byte, minV, maxV TLSProtocol) *TLSConfig {
 	return &TLSConfig{
 		RootCA:                 rootCA,
 		Cert:                   cert,
 		Key:                    key,
 		KeyPass:                keyPass,
-		TLSProtocolsMinVersion: min,
-		TLSProtocolsMaxVersion: max,
+		TLSProtocolsMinVersion: minV,
+		TLSProtocolsMaxVersion: maxV,
 	}
 }
 

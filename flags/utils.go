@@ -4,7 +4,6 @@ import (
 	"bytes"
 	"encoding/base64"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"path/filepath"
 	"strings"
@@ -78,7 +77,7 @@ func readFromFile(filePath string, removeTrailingNewLine bool) ([]byte, error) {
 // Read content from path
 func readFromPath(filePath string, removeTrailingNewLine bool) ([][]byte, error) {
 	filePath, _ = filepath.Abs(filePath)
-	fileSysInfo, err := ioutil.ReadDir(filePath)
+	fileSysInfo, err := os.ReadDir(filePath)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to read from file `%s`: `%v`", filePath, err)
