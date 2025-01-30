@@ -9,7 +9,7 @@ import (
 	"reflect"
 	"testing"
 
-	as "github.com/aerospike/aerospike-client-go/v7"
+	as "github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/tools-common-go/testutils"
 )
 

@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	as "github.com/aerospike/aerospike-client-go/v7"
+	as "github.com/aerospike/aerospike-client-go/v8"
 	"github.com/stretchr/testify/suite"
 )
 
