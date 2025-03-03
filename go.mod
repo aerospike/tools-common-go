@@ -3,7 +3,7 @@ module github.com/aerospike/tools-common-go
 go 1.23
 
 require (
-	github.com/aerospike/aerospike-client-go/v8 v8.0.0
+	github.com/aerospike/aerospike-client-go/v8 v8.1.0
 	github.com/docker/docker v27.5.0+incompatible
 	github.com/docker/go-connections v0.5.0
 	github.com/spf13/pflag v1.0.5
