@@ -4,7 +4,7 @@ go 1.23.11
 
 require (
 	github.com/aerospike/aerospike-client-go/v8 v8.2.2
-	github.com/docker/docker v28.3.2+incompatible
+	github.com/docker/docker v28.5.0+incompatible
 	github.com/docker/go-connections v0.5.0
 	github.com/spf13/pflag v1.0.6
 	github.com/spf13/viper v1.20.1
@@ -22,7 +22,6 @@ require (
 	github.com/go-logr/logr v1.4.2 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect
 	github.com/go-viper/mapstructure/v2 v2.2.1 // indirect
-	github.com/gogo/protobuf v1.3.2 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/moby/docker-image-spec v1.3.1 // indirect
 	github.com/moby/sys/atomicwriter v0.1.0 // indirect
