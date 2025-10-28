@@ -3,12 +3,12 @@ module github.com/aerospike/tools-common-go
 go 1.23.11
 
 require (
-	github.com/aerospike/aerospike-client-go/v8 v8.2.2
+	github.com/aerospike/aerospike-client-go/v8 v8.4.0
 	github.com/docker/docker v28.3.2+incompatible
-	github.com/docker/go-connections v0.5.0
-	github.com/spf13/pflag v1.0.6
+	github.com/docker/go-connections v0.6.0
+	github.com/spf13/pflag v1.0.10
 	github.com/spf13/viper v1.20.1
-	github.com/stretchr/testify v1.10.0
+	github.com/stretchr/testify v1.11.1
 )
 
 require (
