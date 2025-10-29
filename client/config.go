@@ -7,11 +7,12 @@ import (
 // AerospikeConfig represents the intermediate configuration for an Aerospike
 // client. This can be constructed directly using flags.AerospikeFlags or
 type AerospikeConfig struct {
-	Seeds    HostTLSPortSlice
-	User     string
-	Password string
-	AuthMode as.AuthMode
-	TLS      *TLSConfig
+	Seeds                HostTLSPortSlice
+	User                 string
+	Password             string
+	AuthMode             as.AuthMode
+	TLS                  *TLSConfig
+	UseServicesAlternate bool
 }
 
 // NewDefaultAerospikeConfig creates a new default AerospikeConfig instance.
@@ -28,6 +29,7 @@ func (ac *AerospikeConfig) NewClientPolicy() (*as.ClientPolicy, error) {
 	clientPolicy.User = ac.User
 	clientPolicy.Password = ac.Password
 	clientPolicy.AuthMode = ac.AuthMode
+	clientPolicy.UseServicesAlternate = ac.UseServicesAlternate
 
 	if ac.TLS != nil {
 		tlsConfig, err := ac.TLS.NewGoTLSConfig()

@@ -9,19 +9,20 @@ import (
 // AerospikeFlags defines the storage backing
 // for Aerospike pflags.FlagSet returned from SetAerospikeFlags.
 type AerospikeFlags struct {
-	Seeds          HostTLSPortSliceFlag `mapstructure:"host"`
-	DefaultPort    int                  `mapstructure:"port"`
-	User           string               `mapstructure:"user"`
-	Password       PasswordFlag         `mapstructure:"password"`
-	AuthMode       AuthModeFlag         `mapstructure:"auth"`
-	TLSEnable      bool                 `mapstructure:"tls-enable"`
-	TLSName        string               `mapstructure:"tls-name"`
-	TLSProtocols   TLSProtocolsFlag     `mapstructure:"tls-protocols"`
-	TLSRootCAFile  CertFlag             `mapstructure:"tls-cafile"`
-	TLSRootCAPath  CertPathFlag         `mapstructure:"tls-capath"`
-	TLSCertFile    CertFlag             `mapstructure:"tls-certfile"`
-	TLSKeyFile     CertFlag             `mapstructure:"tls-keyfile"`
-	TLSKeyFilePass PasswordFlag         `mapstructure:"tls-keyfile-password"`
+	Seeds                HostTLSPortSliceFlag `mapstructure:"host"`
+	DefaultPort          int                  `mapstructure:"port"`
+	User                 string               `mapstructure:"user"`
+	Password             PasswordFlag         `mapstructure:"password"`
+	AuthMode             AuthModeFlag         `mapstructure:"auth"`
+	TLSEnable            bool                 `mapstructure:"tls-enable"`
+	TLSName              string               `mapstructure:"tls-name"`
+	TLSProtocols         TLSProtocolsFlag     `mapstructure:"tls-protocols"`
+	TLSRootCAFile        CertFlag             `mapstructure:"tls-cafile"`
+	TLSRootCAPath        CertPathFlag         `mapstructure:"tls-capath"`
+	TLSCertFile          CertFlag             `mapstructure:"tls-certfile"`
+	TLSKeyFile           CertFlag             `mapstructure:"tls-keyfile"`
+	TLSKeyFilePass       PasswordFlag         `mapstructure:"tls-keyfile-password"`
+	UseServicesAlternate bool                 `mapstructure:"use-services-alternate"`
 }
 
 func NewDefaultAerospikeFlags() *AerospikeFlags {
@@ -59,6 +60,10 @@ func (af *AerospikeFlags) NewFlagSet(fmtUsage UsageFormatter) *pflag.FlagSet {
 		"Set the TLS protocol selection criteria. This format is the same as"+
 			" Apache's SSLProtocol documented at https://httpd.apache.org/docs/current/mod/mod_ssl.html#ssl protocol.",
 	))
+	f.BoolVar(&af.UseServicesAlternate, "services-alternate", false,
+		fmtUsage("Determines if the client should use \"services-alternate\" instead of \"services\""+
+			" in info request during cluster tending."),
+	)
 
 	return f
 }
@@ -69,6 +74,7 @@ func (af *AerospikeFlags) NewAerospikeConfig() *client.AerospikeConfig {
 	aerospikeConf.User = af.User
 	aerospikeConf.Password = string(af.Password)
 	aerospikeConf.AuthMode = as.AuthMode(af.AuthMode)
+	aerospikeConf.UseServicesAlternate = af.UseServicesAlternate
 
 	if af.TLSEnable {
 		rootCA := [][]byte{}

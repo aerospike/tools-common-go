@@ -96,11 +96,12 @@ func (suite *FlagsTestSuite) TestNewAerospikeFlagSet() {
 			Min: tls.VersionTLS13,
 			Max: tls.VersionTLS13,
 		},
-		TLSRootCAFile:  []byte(rootCATxt),
-		TLSRootCAPath:  [][]byte{[]byte(rootCATxt), []byte(rootCATxt2)},
-		TLSCertFile:    []byte(certTxt),
-		TLSKeyFile:     []byte(keyTxt),
-		TLSKeyFilePass: []byte("key-pass"),
+		TLSRootCAFile:        []byte(rootCATxt),
+		TLSRootCAPath:        [][]byte{[]byte(rootCATxt), []byte(rootCATxt2)},
+		TLSCertFile:          []byte(certTxt),
+		TLSKeyFile:           []byte(keyTxt),
+		TLSKeyFilePass:       []byte("key-pass"),
+		UseServicesAlternate: true,
 	}
 
 	err = flagSet.Parse([]string{
@@ -116,7 +117,9 @@ func (suite *FlagsTestSuite) TestNewAerospikeFlagSet() {
 		"--tls-capath", rootCAPath,
 		"--tls-certfile", certFile,
 		"--tls-keyfile", keyFile,
-		"--tls-keyfile-password", "key-pass"},
+		"--tls-keyfile-password", "key-pass",
+		"--services-alternate", "true",
+	},
 	)
 
 	suite.NoError(err)
@@ -153,6 +156,7 @@ func (suite *FlagsTestSuite) TestNewAerospikeConfig() {
 					Min: tls.VersionTLS11,
 					Max: tls.VersionTLS13,
 				},
+				UseServicesAlternate: true,
 			},
 			&client.AerospikeConfig{
 				Seeds: client.HostTLSPortSlice{
@@ -173,6 +177,7 @@ func (suite *FlagsTestSuite) TestNewAerospikeConfig() {
 					TLSProtocolsMinVersion: tls.VersionTLS11,
 					TLSProtocolsMaxVersion: tls.VersionTLS13,
 				},
+				UseServicesAlternate: true,
 			},
 		},
 		{
@@ -208,9 +213,10 @@ func (suite *FlagsTestSuite) TestNewAerospikeConfig() {
 						Port:    3001,
 					},
 				},
-				User:     "admin",
-				Password: "admin",
-				AuthMode: as.AuthModeExternal,
+				User:                 "admin",
+				Password:             "admin",
+				AuthMode:             as.AuthModeExternal,
+				UseServicesAlternate: false,
 			},
 		},
 		{
