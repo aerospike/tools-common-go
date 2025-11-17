@@ -7,7 +7,7 @@ import (
 func TestNewDefaultHostTLSPort(t *testing.T) {
 	expected := NewHostTLSPort()
 	expected.Host = DefaultIPv4
-	expected.Port = DefaultPort
+	expected.Port = 0
 	expected.TLSName = ""
 
 	result := NewDefaultHostTLSPort()
