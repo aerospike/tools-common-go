@@ -58,7 +58,7 @@ func InitConfig(userProvidedCfgFile, instance string, flags *pflag.FlagSet) (str
 			viper.SetConfigName(confName + ".conf")
 			viper.SetConfigType("toml")
 
-			if err := viper.ReadInConfig(); err != nil {
+			if err = viper.ReadInConfig(); err != nil {
 				return "", nil
 			}
 		} else {

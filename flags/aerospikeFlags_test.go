@@ -31,10 +31,10 @@ type FlagsTestSuite struct {
 	suite.Suite
 }
 
-func (suite *FlagsTestSuite) TestNewDefaultAerospikeFlags() {
+func (s *FlagsTestSuite) TestNewDefaultAerospikeFlags() {
 	defaultAerospikeFlags := NewDefaultAerospikeFlags()
 
-	suite.Equal(
+	s.Equal(
 		&AerospikeFlags{
 			Seeds:        NewHostTLSPortSliceFlag(),
 			DefaultPort:  3000,
@@ -44,7 +44,7 @@ func (suite *FlagsTestSuite) TestNewDefaultAerospikeFlags() {
 	)
 }
 
-func (suite *FlagsTestSuite) TestNewAerospikeFlagSet() {
+func (s *FlagsTestSuite) TestNewAerospikeFlagSet() {
 	files := []struct {
 		file string
 		txt  string
@@ -58,12 +58,12 @@ func (suite *FlagsTestSuite) TestNewAerospikeFlagSet() {
 
 	err := os.MkdirAll(rootCAPath, 0o0777)
 	if err != nil {
-		suite.FailNow("Failed to create root CA path", err)
+		s.FailNow("Failed to create root CA path", err)
 	}
 
 	for _, file := range files {
 		err := os.WriteFile(file.file, []byte(file.txt), 0o0600)
-		suite.NoError(err)
+		s.NoError(err)
 	}
 
 	defer func() {
@@ -77,12 +77,12 @@ func (suite *FlagsTestSuite) TestNewAerospikeFlagSet() {
 	expectedSeeds := NewHostTLSPortSliceFlag()
 
 	err = expectedSeeds.Set("1.1.1.1:TLS-NAME:3002")
-	suite.NoError(err)
+	s.NoError(err)
 
 	expectedAuthMode := AuthModeFlag(0)
 
 	err = expectedAuthMode.Set("EXTERNAL")
-	suite.NoError(err)
+	s.NoError(err)
 
 	expectedFlags := &AerospikeFlags{
 		Seeds:       expectedSeeds,
@@ -122,11 +122,11 @@ func (suite *FlagsTestSuite) TestNewAerospikeFlagSet() {
 	},
 	)
 
-	suite.NoError(err)
-	suite.Equal(expectedFlags, actualFlags)
+	s.NoError(err)
+	s.Equal(expectedFlags, actualFlags)
 }
 
-func (suite *FlagsTestSuite) TestNewAerospikeConfig() {
+func (s *FlagsTestSuite) TestNewAerospikeConfig() {
 	testCases := []struct {
 		input  *AerospikeFlags
 		output *client.AerospikeConfig
@@ -316,9 +316,9 @@ func (suite *FlagsTestSuite) TestNewAerospikeConfig() {
 	}
 
 	for _, tc := range testCases {
-		suite.T().Run("", func(t *testing.T) {
+		s.T().Run("", func(_ *testing.T) {
 			actual := tc.input.NewAerospikeConfig()
-			suite.Equal(tc.output, actual)
+			s.Equal(tc.output, actual)
 		})
 	}
 }

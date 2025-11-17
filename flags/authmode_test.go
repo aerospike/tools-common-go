@@ -12,7 +12,7 @@ type AuthModeTestSuite struct {
 	suite.Suite
 }
 
-func (suite *AuthModeTestSuite) TestAuthModeFlag() {
+func (s *AuthModeTestSuite) TestAuthModeFlag() {
 	testCases := []struct {
 		input  string
 		output AuthModeFlag
@@ -44,13 +44,13 @@ func (suite *AuthModeTestSuite) TestAuthModeFlag() {
 	}
 
 	for _, tc := range testCases {
-		suite.T().Run(tc.input, func(_ *testing.T) {
+		s.T().Run(tc.input, func(_ *testing.T) {
 			var actual AuthModeFlag
 
-			suite.NoError(actual.Set(tc.input))
-			suite.Equal(actual, tc.output)
-			suite.Equal(actual.String(), strings.ToUpper(tc.input))
-			suite.Equal(actual.Type(), "INTERNAL,EXTERNAL,PKI")
+			s.NoError(actual.Set(tc.input))
+			s.Equal(actual, tc.output)
+			s.Equal(actual.String(), strings.ToUpper(tc.input))
+			s.Equal(actual.Type(), "INTERNAL,EXTERNAL,PKI")
 		})
 	}
 }

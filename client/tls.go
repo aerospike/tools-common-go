@@ -118,8 +118,8 @@ func LoadServerCertAndKey(certFileBytes, keyFileBytes, keyPassBytes []byte) ([]t
 	}
 
 	// Check and Decrypt the Key Block using passphrase
-	if x509.IsEncryptedPEMBlock(keyBlock) { //nolint:staticcheck,lll // This needs to be addressed by aerospike as multiple projects require this functionality
-		decryptedDERBytes, err := x509.DecryptPEMBlock(keyBlock, keyPassBytes) //nolint:staticcheck,lll // This needs to be addressed by aerospike as multiple projects require this functionality
+	if x509.IsEncryptedPEMBlock(keyBlock) { //nolint:staticcheck // This needs to be addressed by aerospike as multiple projects require this functionality
+		decryptedDERBytes, err := x509.DecryptPEMBlock(keyBlock, keyPassBytes) //nolint:staticcheck // This needs to be addressed by aerospike as multiple projects require this functionality
 		if err != nil {
 			return nil, fmt.Errorf("failed to decrypt PEM Block: `%s`", err)
 		}

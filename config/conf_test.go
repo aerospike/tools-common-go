@@ -53,31 +53,31 @@ type ConfigTestSuite struct {
 	actualCfgFile string
 }
 
-func (suite *ConfigTestSuite) SetupSuite() {
+func (s *ConfigTestSuite) SetupSuite() {
 	wd, _ := os.Getwd()
-	suite.tmpDir = path.Join(wd, "test-tmp")
-	suite.file = path.Join(wd, "test-tmp", suite.file)
+	s.tmpDir = path.Join(wd, "test-tmp")
+	s.file = path.Join(wd, "test-tmp", s.file)
 
-	err := os.MkdirAll(suite.tmpDir, 0o0777)
+	err := os.MkdirAll(s.tmpDir, 0o0777)
 	if err != nil {
-		suite.FailNow("Failed to create tmp dir", err)
+		s.FailNow("Failed to create tmp dir", err)
 	}
 
-	err = os.WriteFile(suite.file, []byte(suite.fileTxt), 0o0600)
+	err = os.WriteFile(s.file, []byte(s.fileTxt), 0o0600)
 	if err != nil {
-		suite.FailNow("Failed to write config file", err)
+		s.FailNow("Failed to write config file", err)
 	}
 }
 
-func (suite *ConfigTestSuite) TearDownSuite() {
-	os.RemoveAll(suite.tmpDir)
+func (s *ConfigTestSuite) TearDownSuite() {
+	os.RemoveAll(s.tmpDir)
 }
 
-func (suite *ConfigTestSuite) SetupTest() {
+func (s *ConfigTestSuite) SetupTest() {
 	Reset()
 }
 
-func (suite *ConfigTestSuite) NewCmds(file, instance string) (rootCmd, cmd1, cmd2 *cobra.Command) {
+func (s *ConfigTestSuite) NewCmds(file, instance string) (rootCmd, cmd1, cmd2 *cobra.Command) {
 	rootCmd = &cobra.Command{
 		Use: "test",
 		PersistentPreRunE: func(cmd *cobra.Command, _ []string) error {
@@ -86,7 +86,7 @@ func (suite *ConfigTestSuite) NewCmds(file, instance string) (rootCmd, cmd1, cmd
 				return fmt.Errorf("Failed to initialize config: %s", err)
 			}
 
-			suite.actualCfgFile = cfgFileTmp
+			s.actualCfgFile = cfgFileTmp
 
 			return nil
 		},
@@ -110,10 +110,25 @@ func (suite *ConfigTestSuite) NewCmds(file, instance string) (rootCmd, cmd1, cmd
 	return rootCmd, cmd1, cmd2
 }
 
+// Helper method to assert flag values and reduce code duplication
+func (s *ConfigTestSuite) assertFlagValues(cmd *cobra.Command, expectedStr string, expectedInt int, expectedBool bool) {
+	str, err := cmd.Flags().GetString("str")
+	s.NoError(err)
+	s.Equal(expectedStr, str)
+
+	intVal, err := cmd.Flags().GetInt("int")
+	s.NoError(err)
+	s.Equal(expectedInt, intVal)
+
+	boolVal, err := cmd.Flags().GetBool("bool")
+	s.NoError(err)
+	s.Equal(expectedBool, boolVal)
+}
+
 // Tests the whether different flags on different cmcan read the same values
 // from the config file.
-func (suite *ConfigTestSuite) TestInitConfigWithDuplicateFlags() {
-	rootCmd, cmd1, cmd2 := suite.NewCmds(suite.file, "")
+func (s *ConfigTestSuite) TestInitConfigWithDuplicateFlags() {
+	rootCmd, cmd1, cmd2 := s.NewCmds(s.file, "")
 
 	flagSet := &pflag.FlagSet{}
 	flagSet.String("str", "", "string flag")
@@ -134,43 +149,43 @@ func (suite *ConfigTestSuite) TestInitConfigWithDuplicateFlags() {
 	rootCmd.SetArgs([]string{"test1"})
 	err := rootCmd.Execute()
 
-	suite.NoError(err)
+	s.NoError(err)
 
 	str, err := cmd1.Flags().GetString("str")
-	suite.NoError(err)
-	suite.Equal("localhost:3000", str)
+	s.NoError(err)
+	s.Equal("localhost:3000", str)
 
 	intVal, err := cmd1.Flags().GetInt("int")
-	suite.NoError(err)
-	suite.Equal(3000, intVal)
+	s.NoError(err)
+	s.Equal(3000, intVal)
 
 	boolVal, err := cmd1.Flags().GetBool("bool")
-	suite.NoError(err)
-	suite.Equal(true, boolVal)
+	s.NoError(err)
+	s.Equal(true, boolVal)
 
 	// Cmd2
 	rootCmd.SetArgs([]string{"test2"})
 	err = rootCmd.Execute()
 
-	suite.NoError(err)
+	s.NoError(err)
 
 	str, err = cmd2.Flags().GetString("str")
-	suite.NoError(err)
-	suite.Equal("localhost:3000", str)
+	s.NoError(err)
+	s.Equal("localhost:3000", str)
 
 	intVal, err = cmd2.Flags().GetInt("int")
-	suite.NoError(err)
-	suite.Equal(3000, intVal)
+	s.NoError(err)
+	s.Equal(3000, intVal)
 
 	boolVal, err = cmd2.Flags().GetBool("bool")
-	suite.NoError(err)
-	suite.Equal(true, boolVal)
+	s.NoError(err)
+	s.Equal(true, boolVal)
 
-	suite.Equal(suite.actualCfgFile, suite.file)
+	s.Equal(s.actualCfgFile, s.file)
 }
 
-func (suite *ConfigTestSuite) TestInitConfigWithMultiSections() {
-	rootCmd, cmd1, _ := suite.NewCmds(suite.file, "")
+func (s *ConfigTestSuite) TestInitConfigWithMultiSections() {
+	rootCmd, cmd1, _ := s.NewCmds(s.file, "")
 
 	flagSet := &pflag.FlagSet{}
 	flagSet.String("str", "", "string flag")
@@ -191,37 +206,37 @@ func (suite *ConfigTestSuite) TestInitConfigWithMultiSections() {
 	rootCmd.SetArgs([]string{"test1"})
 	err := rootCmd.Execute()
 
-	suite.NoError(err)
+	s.NoError(err)
 
 	str, err := cmd1.Flags().GetString("str")
-	suite.NoError(err)
-	suite.Equal("localhost:3000", str)
+	s.NoError(err)
+	s.Equal("localhost:3000", str)
 
 	intVal, err := cmd1.Flags().GetInt("int")
-	suite.NoError(err)
-	suite.Equal(3000, intVal)
+	s.NoError(err)
+	s.Equal(3000, intVal)
 
 	boolVal, err := cmd1.Flags().GetBool("bool")
-	suite.NoError(err)
-	suite.Equal(true, boolVal)
+	s.NoError(err)
+	s.Equal(true, boolVal)
 
 	str, err = cmd1.Flags().GetString("str2")
-	suite.NoError(err)
-	suite.Equal("localhost:4000", str)
+	s.NoError(err)
+	s.Equal("localhost:4000", str)
 
 	intVal, err = cmd1.Flags().GetInt("int2")
-	suite.NoError(err)
-	suite.Equal(4000, intVal)
+	s.NoError(err)
+	s.Equal(4000, intVal)
 
 	boolVal, err = cmd1.Flags().GetBool("bool2")
-	suite.NoError(err)
-	suite.Equal(false, boolVal)
+	s.NoError(err)
+	s.Equal(false, boolVal)
 
-	suite.Equal(suite.actualCfgFile, suite.file)
+	s.Equal(s.actualCfgFile, s.file)
 }
 
-func (suite *ConfigTestSuite) TestInitConfigWithInstance() {
-	rootCmd, cmd1, _ := suite.NewCmds(suite.file, "instance")
+func (s *ConfigTestSuite) TestInitConfigWithInstance() {
+	rootCmd, cmd1, _ := s.NewCmds(s.file, "instance")
 
 	flagSet := &pflag.FlagSet{}
 	flagSet.String("str", "", "string flag")
@@ -235,29 +250,17 @@ func (suite *ConfigTestSuite) TestInitConfigWithInstance() {
 	rootCmd.SetArgs([]string{"test1"})
 	err := rootCmd.Execute()
 
-	suite.NoError(err)
-
-	str, err := cmd1.Flags().GetString("str")
-	suite.NoError(err)
-	suite.Equal("localhost:3000 instance", str)
-
-	intVal, err := cmd1.Flags().GetInt("int")
-	suite.NoError(err)
-	suite.Equal(5000, intVal)
-
-	boolVal, err := cmd1.Flags().GetBool("bool")
-	suite.NoError(err)
-	suite.Equal(true, boolVal)
-
-	suite.Equal(suite.actualCfgFile, suite.file)
+	s.NoError(err)
+	s.assertFlagValues(cmd1, "localhost:3000 instance", 5000, true)
+	s.Equal(s.actualCfgFile, s.file)
 }
 
 // This is used by asvec. Instead of having a group like cluster,asadm,aql etc.
 // and adding and _{instance} to the group to select config params it uses and
 // empty group and uses then instance arg as the group name. Affectively
 // allowing the user to define the full group name at runtime.
-func (suite *ConfigTestSuite) TestInitConfigWithoutGroupsButWithInstance() {
-	rootCmd, cmd1, _ := suite.NewCmds(suite.file, "group1")
+func (s *ConfigTestSuite) TestInitConfigWithoutGroupsButWithInstance() {
+	rootCmd, cmd1, _ := s.NewCmds(s.file, "group1")
 
 	flagSet := &pflag.FlagSet{}
 	flagSet.String("str", "", "string flag")
@@ -271,25 +274,13 @@ func (suite *ConfigTestSuite) TestInitConfigWithoutGroupsButWithInstance() {
 	rootCmd.SetArgs([]string{"test1"})
 	err := rootCmd.Execute()
 
-	suite.NoError(err)
-
-	str, err := cmd1.Flags().GetString("str")
-	suite.NoError(err)
-	suite.Equal("localhost:3000", str)
-
-	intVal, err := cmd1.Flags().GetInt("int")
-	suite.NoError(err)
-	suite.Equal(3000, intVal)
-
-	boolVal, err := cmd1.Flags().GetBool("bool")
-	suite.NoError(err)
-	suite.Equal(true, boolVal)
-
-	suite.Equal(suite.actualCfgFile, suite.file)
+	s.NoError(err)
+	s.assertFlagValues(cmd1, "localhost:3000", 3000, true)
+	s.Equal(s.actualCfgFile, s.file)
 }
 
-func (suite *ConfigTestSuite) TestInitConfigWithFlagsOverwrite() {
-	rootCmd, cmd1, _ := suite.NewCmds(suite.file, "")
+func (s *ConfigTestSuite) TestInitConfigWithFlagsOverwrite() {
+	rootCmd, cmd1, _ := s.NewCmds(s.file, "")
 
 	flagSet := &pflag.FlagSet{}
 	flagSet.String("str", "", "string flag")
@@ -303,23 +294,23 @@ func (suite *ConfigTestSuite) TestInitConfigWithFlagsOverwrite() {
 	rootCmd.SetArgs([]string{"test1", "--str", "overwrite"})
 	err := rootCmd.Execute()
 
-	suite.NoError(err)
+	s.NoError(err)
 
 	str, err := cmd1.Flags().GetString("str")
-	suite.NoError(err)
-	suite.Equal("overwrite", str)
+	s.NoError(err)
+	s.Equal("overwrite", str)
 
 	intVal, err := cmd1.Flags().GetInt("int")
-	suite.NoError(err)
-	suite.Equal(3000, intVal)
+	s.NoError(err)
+	s.Equal(3000, intVal)
 
 	boolVal, err := cmd1.Flags().GetBool("bool")
-	suite.NoError(err)
-	suite.Equal(true, boolVal)
+	s.NoError(err)
+	s.Equal(true, boolVal)
 }
 
-func (suite *ConfigTestSuite) TestInitConfigWithFlagsDefaults() {
-	rootCmd, cmd1, _ := suite.NewCmds(suite.file, "DNE")
+func (s *ConfigTestSuite) TestInitConfigWithFlagsDefaults() {
+	rootCmd, cmd1, _ := s.NewCmds(s.file, "DNE")
 
 	flagSet := &pflag.FlagSet{}
 	flagSet.String("str", "foo", "string flag")
@@ -333,21 +324,9 @@ func (suite *ConfigTestSuite) TestInitConfigWithFlagsDefaults() {
 	rootCmd.SetArgs([]string{"test1"})
 	err := rootCmd.Execute()
 
-	suite.NoError(err)
-
-	str, err := cmd1.Flags().GetString("str")
-	suite.NoError(err)
-	suite.Equal("foo", str)
-
-	intVal, err := cmd1.Flags().GetInt("int")
-	suite.NoError(err)
-	suite.Equal(99, intVal)
-
-	boolVal, err := cmd1.Flags().GetBool("bool")
-	suite.NoError(err)
-	suite.Equal(true, boolVal)
-
-	suite.Equal(suite.actualCfgFile, suite.file)
+	s.NoError(err)
+	s.assertFlagValues(cmd1, "foo", 99, true)
+	s.Equal(s.actualCfgFile, s.file)
 }
 
 func TestRunConfigTestSuite(t *testing.T) {

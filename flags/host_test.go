@@ -11,7 +11,7 @@ type HostTestSuite struct {
 	suite.Suite
 }
 
-func (suite *HostTestSuite) TestHostTLSPortSetGet() {
+func (s *HostTestSuite) TestHostTLSPortSetGet() {
 	testCases := []struct {
 		input  string
 		output HostTLSPortSliceFlag
@@ -167,17 +167,17 @@ func (suite *HostTestSuite) TestHostTLSPortSetGet() {
 	}
 
 	for _, tc := range testCases {
-		suite.T().Run(tc.input, func(_ *testing.T) {
+		s.T().Run(tc.input, func(_ *testing.T) {
 			actual := NewHostTLSPortSliceFlag()
 
-			suite.NoError(actual.Set(tc.input))
-			suite.Equal(tc.output, actual)
-			suite.Equal(tc.slice, actual.GetSlice())
+			s.NoError(actual.Set(tc.input))
+			s.Equal(tc.output, actual)
+			s.Equal(tc.slice, actual.GetSlice())
 		})
 	}
 }
 
-func (suite *HostTestSuite) TestHostTLSPortAppend() {
+func (s *HostTestSuite) TestHostTLSPortAppend() {
 	testCases := []struct {
 		input  string
 		append string
@@ -201,17 +201,17 @@ func (suite *HostTestSuite) TestHostTLSPortAppend() {
 	}
 
 	for _, tc := range testCases {
-		suite.T().Run(tc.input, func(_ *testing.T) {
+		s.T().Run(tc.input, func(_ *testing.T) {
 			actual := NewHostTLSPortSliceFlag()
 
-			suite.NoError(actual.Set(tc.input))
-			suite.NoError(actual.Set(tc.append))
-			suite.Equal(tc.output, actual)
+			s.NoError(actual.Set(tc.input))
+			s.NoError(actual.Set(tc.append))
+			s.Equal(tc.output, actual)
 		})
 	}
 }
 
-func (suite *HostTestSuite) TestHostTLSPortString() {
+func (s *HostTestSuite) TestHostTLSPortString() {
 	testCases := []struct {
 		input  HostTLSPortSliceFlag
 		output string
@@ -236,8 +236,8 @@ func (suite *HostTestSuite) TestHostTLSPortString() {
 	}
 
 	for _, tc := range testCases {
-		suite.T().Run(tc.output, func(t *testing.T) {
-			suite.Equal(tc.output, tc.input.String())
+		s.T().Run(tc.output, func(_ *testing.T) {
+			s.Equal(tc.output, tc.input.String())
 		})
 	}
 }

@@ -18,8 +18,8 @@ const (
 // input option.  It implements the pflag Value and SliceValue interfaces to
 // enable automatic parsing by cobra.
 type HostTLSPortSliceFlag struct {
-	useDefault bool
 	Seeds      client.HostTLSPortSlice
+	useDefault bool
 }
 
 func NewHostTLSPortSliceFlag() HostTLSPortSliceFlag {
@@ -67,16 +67,15 @@ func parseHostTLSPort(v string) (*client.HostTLSPort, error) {
 
 				name := groupNames[idx]
 
-				switch {
-				case name == "host":
+				switch name {
+				case "host":
 					host.Host = match
-				case name == "tlsName":
+				case "tlsName":
 					host.TLSName = match
-				case name == "port":
+				case "port":
 					var intPort int64
 
 					intPort, err = strconv.ParseInt(match, 0, 0)
-
 					if err == nil {
 						host.Port = int(intPort)
 					}
@@ -97,7 +96,6 @@ func parseHostTLSPort(v string) (*client.HostTLSPort, error) {
 // Append adds the specified value to the end of the flag value list.
 func (slice *HostTLSPortSliceFlag) Append(val string) error {
 	host, err := parseHostTLSPort(val)
-
 	if err != nil {
 		return err
 	}

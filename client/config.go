@@ -7,11 +7,11 @@ import (
 // AerospikeConfig represents the intermediate configuration for an Aerospike
 // client. This can be constructed directly using flags.AerospikeFlags or
 type AerospikeConfig struct {
-	Seeds                HostTLSPortSlice
+	TLS                  *TLSConfig
 	User                 string
 	Password             string
+	Seeds                HostTLSPortSlice
 	AuthMode             as.AuthMode
-	TLS                  *TLSConfig
 	UseServicesAlternate bool
 }
 
