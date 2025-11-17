@@ -96,10 +96,7 @@ func (af *AerospikeFlags) NewAerospikeConfig() *client.AerospikeConfig {
 	}
 
 	for _, elem := range aerospikeConf.Seeds {
-		// If only host is set, elem.Port will be 0. So need to set it to the default port.
-		// If the host is not set, elem.Port will be 3000, and if af.DefaultPort is set different from DefaultPort,
-		// it should be applied.
-		if elem.Port == 0 || af.DefaultPort != DefaultPort {
+		if elem.Port == 0 {
 			elem.Port = af.DefaultPort
 		}
 

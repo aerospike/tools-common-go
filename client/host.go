@@ -22,7 +22,7 @@ func NewDefaultHostTLSPort() *HostTLSPort {
 	return &HostTLSPort{
 		DefaultIPv4,
 		"",
-		DefaultPort,
+		0,
 	}
 }
 
