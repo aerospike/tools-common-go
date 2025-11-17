@@ -222,10 +222,17 @@ func TestLoadServerCertAndKey(t *testing.T) {
 	}
 }
 
+// encryptPEMBlock encrypts a PEM block using legacy RFC 1423 format
+// TODO: Replace with PKCS#8 encryption for better security:
+//   - Use x509.MarshalPKCS8PrivateKey() to convert key to PKCS#8 format
+//   - Use pkcs8.ConvertPrivateKeyToPKCS8() for format conversion
+//   - Use appropriate authenticated encryption (AES-GCM, ChaCha20-Poly1305)
 func encryptPEMBlock(keyFileBytes, keyPassBytes []byte) []byte {
 	block, _ := pem.Decode(keyFileBytes)
 
-	encryptedBlock, _ := x509.EncryptPEMBlock( //nolint:staticcheck,lll // This needs to be addressed by aerospike as multiple projects require this functionality
+	// TODO: Replace with modern PKCS#8 encryption when legacy support is no longer required
+	// This uses deprecated RFC 1423 encryption which is vulnerable to padding oracle attacks
+	encryptedBlock, _ := x509.EncryptPEMBlock( //nolint:staticcheck // Legacy PEM encryption - replace with PKCS#8
 		rand.Reader,
 		block.Type,
 		block.Bytes,

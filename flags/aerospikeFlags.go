@@ -9,19 +9,19 @@ import (
 // AerospikeFlags defines the storage backing
 // for Aerospike pflags.FlagSet returned from SetAerospikeFlags.
 type AerospikeFlags struct {
-	Seeds                HostTLSPortSliceFlag `mapstructure:"host"`
-	DefaultPort          int                  `mapstructure:"port"`
-	User                 string               `mapstructure:"user"`
-	Password             PasswordFlag         `mapstructure:"password"`
-	AuthMode             AuthModeFlag         `mapstructure:"auth"`
-	TLSEnable            bool                 `mapstructure:"tls-enable"`
 	TLSName              string               `mapstructure:"tls-name"`
-	TLSProtocols         TLSProtocolsFlag     `mapstructure:"tls-protocols"`
+	User                 string               `mapstructure:"user"`
+	TLSCertFile          CertFlag             `mapstructure:"tls-certfile"`
+	Password             PasswordFlag         `mapstructure:"password"`
 	TLSRootCAFile        CertFlag             `mapstructure:"tls-cafile"`
 	TLSRootCAPath        CertPathFlag         `mapstructure:"tls-capath"`
-	TLSCertFile          CertFlag             `mapstructure:"tls-certfile"`
 	TLSKeyFile           CertFlag             `mapstructure:"tls-keyfile"`
 	TLSKeyFilePass       PasswordFlag         `mapstructure:"tls-keyfile-password"`
+	Seeds                HostTLSPortSliceFlag `mapstructure:"host"`
+	AuthMode             AuthModeFlag         `mapstructure:"auth"`
+	DefaultPort          int                  `mapstructure:"port"`
+	TLSProtocols         TLSProtocolsFlag     `mapstructure:"tls-protocols"`
+	TLSEnable            bool                 `mapstructure:"tls-enable"`
 	UseServicesAlternate bool                 `mapstructure:"use-services-alternate"`
 }
 

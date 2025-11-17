@@ -10,7 +10,7 @@ type UtilsTestSuite struct {
 	suite.Suite
 }
 
-func (suite *UtilsTestSuite) TestWrapString() {
+func (s *UtilsTestSuite) TestWrapString() {
 	testCases := []struct {
 		input    string
 		lineLen  int
@@ -44,14 +44,14 @@ func (suite *UtilsTestSuite) TestWrapString() {
 	}
 
 	for _, tc := range testCases {
-		suite.T().Run("", func(_ *testing.T) {
+		s.T().Run("", func(_ *testing.T) {
 			actual := WrapString(tc.input, tc.lineLen)
-			suite.Equal(tc.expected, actual)
+			s.Equal(tc.expected, actual)
 		})
 	}
 }
 
-func (suite *UtilsTestSuite) TestDefaultWrapHelpString() {
+func (s *UtilsTestSuite) TestDefaultWrapHelpString() {
 	testCases := []struct {
 		input    string
 		expected string
@@ -61,19 +61,27 @@ func (suite *UtilsTestSuite) TestDefaultWrapHelpString() {
 			expected: "Lorem ipsum dolor sit amet, consectetur adipiscing elit.",
 		},
 		{
-			input:    "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam.",
-			expected: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed ut \nperspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque \nlaudantium, totam rem aperiam.",
+			input: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed ut perspiciatis unde omnis iste " +
+				"natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam.",
+			expected: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed ut \n" +
+				"perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque \n" +
+				"laudantium, totam rem aperiam.",
 		},
 		{
-			input:    "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam. Eaque ipsa quae ab illo inventore veritatis et quasi architecto beatae vitae dicta sunt explicabo.",
-			expected: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed ut \nperspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque \nlaudantium, totam rem aperiam. Eaque ipsa quae ab illo inventore veritatis et \nquasi architecto beatae vitae dicta sunt explicabo.",
+			input: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed ut perspiciatis unde omnis iste " +
+				"natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam. Eaque ipsa " +
+				"quae ab illo inventore veritatis et quasi architecto beatae vitae dicta sunt explicabo.",
+			expected: "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed ut \n" +
+				"perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque \n" +
+				"laudantium, totam rem aperiam. Eaque ipsa quae ab illo inventore veritatis et \n" +
+				"quasi architecto beatae vitae dicta sunt explicabo.",
 		},
 	}
 
 	for _, tc := range testCases {
-		suite.T().Run("", func(_ *testing.T) {
+		s.T().Run("", func(_ *testing.T) {
 			actual := DefaultWrapHelpString(tc.input)
-			suite.Equal(tc.expected, actual)
+			s.Equal(tc.expected, actual)
 		})
 	}
 }

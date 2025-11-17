@@ -9,7 +9,6 @@ type PasswordFlag []byte
 
 func (flag *PasswordFlag) Set(val string) error {
 	result, err := flagFormatParser(val, flagFormatB64|flagFormatEnvB64|flagFormatFile|flagFormatEnv)
-
 	if err != nil {
 		return err
 	}

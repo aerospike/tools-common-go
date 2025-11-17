@@ -12,7 +12,7 @@ type TLSModeTestSuite struct {
 	suite.Suite
 }
 
-func (suite *FlagsTestSuite) TestTLSProtocolsFlag() {
+func (s *FlagsTestSuite) TestTLSProtocolsFlag() {
 	testCases := []struct {
 		input  string
 		output TLSProtocolsFlag
@@ -93,15 +93,16 @@ func (suite *FlagsTestSuite) TestTLSProtocolsFlag() {
 	}
 
 	for _, tc := range testCases {
-		suite.T().Run(tc.input, func(_ *testing.T) {
+		s.T().Run(tc.input, func(_ *testing.T) {
 			var actual TLSProtocolsFlag
+
 			err := actual.Set(tc.input)
 
 			if tc.err {
-				suite.Error(err)
+				s.Error(err)
 			} else {
-				suite.NoError(err)
-				suite.Equal(tc.output, actual)
+				s.NoError(err)
+				s.Equal(tc.output, actual)
 			}
 		})
 	}
