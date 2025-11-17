@@ -38,7 +38,7 @@ func NewDefaultAerospikeFlags() *AerospikeFlags {
 func (af *AerospikeFlags) NewFlagSet(fmtUsage UsageFormatter) *pflag.FlagSet {
 	f := &pflag.FlagSet{}
 	f.VarP(&af.Seeds, "host", "h", fmtUsage("The Aerospike host."))
-	f.IntVarP(&af.DefaultPort, "port", "p", 3000, fmtUsage("The default Aerospike port."))
+	f.IntVarP(&af.DefaultPort, "port", "p", DefaultPort, fmtUsage("The default Aerospike port."))
 	f.StringVarP(&af.User, "user", "U", "", fmtUsage("The Aerospike user to use to connect to the Aerospike cluster."))
 	f.VarP(&af.Password, "password", "P", fmtUsage("The Aerospike password to use to connect to the Aerospike cluster."))
 	f.Var(&af.AuthMode, "auth", fmtUsage("The authentication mode used by the Aerospike server."+
@@ -96,7 +96,7 @@ func (af *AerospikeFlags) NewAerospikeConfig() *client.AerospikeConfig {
 	}
 
 	for _, elem := range aerospikeConf.Seeds {
-		if elem.Port == 0 {
+		if af.DefaultPort != DefaultPort {
 			elem.Port = af.DefaultPort
 		}
 
