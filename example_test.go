@@ -25,6 +25,13 @@ This file tests the loading of the configuration file and command line arguments
 It tests the behavior of the viper module, cobra, and our own custom built flags.
 **/
 
+const (
+	testPassword    = "test-password"
+	envUser         = "env-user"
+	defaultUser     = "default-user"
+	defaultPassword = "default-password"
+)
+
 var confTomlFile = "conf_test.conf"
 var confTomlTemplate = `
 # -----------------------------------
@@ -32,8 +39,8 @@ var confTomlTemplate = `
 # -----------------------------------
 [cluster]
 host = "1.1.1.1:3001,2.2.2.2:3002,3.3.3.3"
-user = "default-user"
-password = "default-password"
+user = "` + defaultUser + `"
+password = "` + defaultPassword + `"
 auth = "EXTERNAL"
 
 [cluster_tls]
@@ -49,7 +56,7 @@ tls-keyfile = "{{.KeyFile}}"
 [cluster_instance]
 host = "3.3.3.3:3003,4.4.4.4:3004"
 user = "test-user"
-password = "test-password"
+password = "` + testPassword + `"
 
 [cluster_env]
 host = "5.5.5.5:env-tls-name:1000"
@@ -82,7 +89,7 @@ var confYamlTemplate = `
 # -----------------------------------
 cluster:
   host: "1.1.1.1:3001,2.2.2.2:3002,3.3.3.3"
-  user: "default-user"
+  user: "` + defaultUser + `"
   password: "default-password"
   auth: "EXTERNAL"
 
@@ -99,7 +106,7 @@ cluster_tls:
 cluster_instance:
   host: "3.3.3.3:3003,4.4.4.4:3004"
   user: "test-user"
-  password: "test-password"
+  password: "` + testPassword + `"
 
 cluster_env:
   host: "5.5.5.5:env-tls-name:1000"
@@ -149,75 +156,75 @@ type ConfTestSuite struct {
 	configFileTemplate string
 }
 
-func (suite *ConfTestSuite) SetupSuite() {
+func (s *ConfTestSuite) SetupSuite() {
 	// Encode private key to PKCS#1 ASN.1 PEM.
 	rootCertPEM, err := testutils.GenerateCert()
 	if err != nil {
-		suite.FailNow("Failed to generate cert: %w", err)
+		s.FailNow("Failed to generate cert: %w", err)
 	}
 
 	rootCertPEM2, err := testutils.GenerateCert()
 	if err != nil {
-		suite.FailNow("Failed to generate cert: %w", err)
+		s.FailNow("Failed to generate cert: %w", err)
 	}
 
 	certFileBytes, err := testutils.GenerateCert()
 	if err != nil {
-		suite.FailNow("Failed to generate cert: %w", err)
+		s.FailNow("Failed to generate cert: %w", err)
 	}
 
-	suite.passFile = "file_test.txt"
-	suite.passFileTxt = "password-file\n"
-	suite.rootCAPath = "root-ca-path/"
-	suite.rootCAFile = "root-ca-path/root-ca.pem"
-	suite.rootCATxt = string(rootCertPEM)
-	suite.rootCAFile2 = "root-ca-path/root-ca2.pem"
-	suite.rootCATxt2 = string(rootCertPEM2)
-	suite.certFile = "cert.pem"
-	suite.certTxt = string(certFileBytes)
-	suite.keyFile = "key.pem"
-	suite.keyTxt = string(testutils.KeyFileBytes)
-	suite.keyPassFile = "key-pass.txt"
-	suite.keyPassTxt = "key-pass"
+	s.passFile = "file_test.txt"
+	s.passFileTxt = "password-file\n"
+	s.rootCAPath = "root-ca-path/"
+	s.rootCAFile = "root-ca-path/root-ca.pem"
+	s.rootCATxt = string(rootCertPEM)
+	s.rootCAFile2 = "root-ca-path/root-ca2.pem"
+	s.rootCATxt2 = string(rootCertPEM2)
+	s.certFile = "cert.pem"
+	s.certTxt = string(certFileBytes)
+	s.keyFile = "key.pem"
+	s.keyTxt = string(testutils.KeyFileBytes)
+	s.keyPassFile = "key-pass.txt"
+	s.keyPassTxt = "key-pass"
 
 	wd, err := os.Getwd()
 	if err != nil {
-		suite.FailNow("Failed to get working directory: %w", err)
+		s.FailNow("Failed to get working directory: %w", err)
 	}
 
-	suite.tmpDir = path.Join(wd, "test-tmp")
+	s.tmpDir = path.Join(wd, "test-tmp")
 
-	err = os.MkdirAll(path.Join(suite.tmpDir, suite.rootCAPath), os.ModePerm)
+	err = os.MkdirAll(path.Join(s.tmpDir, s.rootCAPath), os.ModePerm)
 	if err != nil {
-		suite.FailNow("Failed to create directory: %w", err)
+		s.FailNow("Failed to create directory: %w", err)
 	}
 
 	files := []struct {
 		file *string
 		txt  string
 	}{
-		{&suite.passFile, suite.passFileTxt},
-		{&suite.rootCAFile, suite.rootCATxt},
-		{&suite.rootCAFile2, suite.rootCATxt2},
-		{&suite.certFile, suite.certTxt},
-		{&suite.keyFile, suite.keyTxt},
-		{&suite.keyPassFile, suite.keyPassTxt},
+		{&s.passFile, s.passFileTxt},
+		{&s.rootCAFile, s.rootCATxt},
+		{&s.rootCAFile2, s.rootCATxt2},
+		{&s.certFile, s.certTxt},
+		{&s.keyFile, s.keyTxt},
+		{&s.keyPassFile, s.keyPassTxt},
 	}
 
 	for _, file := range files {
-		*file.file = path.Join(suite.tmpDir, *file.file)
-		err := os.WriteFile(*file.file, []byte(file.txt), 0o0600)
+		*file.file = path.Join(s.tmpDir, *file.file)
 
+		err := os.WriteFile(*file.file, []byte(file.txt), 0o0600)
 		if err != nil {
-			suite.FailNow("Failed to write file", err)
+			s.FailNow("Failed to write file", err)
 		}
 
-		suite.files = append(suite.files, *file.file)
+		s.files = append(s.files, *file.file)
 	}
 
-	suite.rootCAPath = path.Join(suite.tmpDir, suite.rootCAPath)
+	s.rootCAPath = path.Join(s.tmpDir, s.rootCAPath)
 	configFileTxt := bytes.Buffer{}
-	t := template.Must(template.New("conf").Parse(suite.configFileTemplate))
+	t := template.Must(template.New("conf").Parse(s.configFileTemplate))
 	err = t.Execute(
 		&configFileTxt,
 		struct {
@@ -228,36 +235,36 @@ func (suite *ConfTestSuite) SetupSuite() {
 			KeyPassFile string
 			PassFile    string
 		}{
-			RootCAPath:  suite.rootCAPath,
-			RootCAFile:  suite.rootCAFile,
-			CertFile:    suite.certFile,
-			KeyFile:     suite.keyFile,
-			KeyPassFile: suite.keyPassFile,
-			PassFile:    suite.passFile,
+			RootCAPath:  s.rootCAPath,
+			RootCAFile:  s.rootCAFile,
+			CertFile:    s.certFile,
+			KeyFile:     s.keyFile,
+			KeyPassFile: s.keyPassFile,
+			PassFile:    s.passFile,
 		},
 	)
 
-	suite.NoError(err)
+	s.NoError(err)
 
-	suite.configFile = path.Join(suite.tmpDir, suite.configFile)
+	s.configFile = path.Join(s.tmpDir, s.configFile)
 
-	err = os.WriteFile(suite.configFile, configFileTxt.Bytes(), 0o0600)
+	err = os.WriteFile(s.configFile, configFileTxt.Bytes(), 0o0600)
 	if err != nil {
-		suite.FailNow("Failed to write file: %s", err)
+		s.FailNow("Failed to write file: %s", err)
 	}
 
-	suite.files = append(suite.files, []string{suite.certFile, suite.rootCAPath, suite.tmpDir}...)
+	s.files = append(s.files, []string{s.certFile, s.rootCAPath, s.tmpDir}...)
 }
 
-func (suite *ConfTestSuite) SetupTest() {
+func (s *ConfTestSuite) SetupTest() {
 	config.Reset()
 }
 
-func (suite *ConfTestSuite) TearDownSuite() {
-	os.RemoveAll(suite.tmpDir)
+func (s *ConfTestSuite) TearDownSuite() {
+	os.RemoveAll(s.tmpDir)
 }
 
-func (suite *ConfTestSuite) NewTestCmd() (*cobra.Command, *flags.ConfFileFlags, *flags.AerospikeFlags) {
+func (s *ConfTestSuite) NewTestCmd() (*cobra.Command, *flags.ConfFileFlags, *flags.AerospikeFlags) {
 	configFileFlags := flags.NewConfFileFlags()
 	aerospikeFlags := flags.NewDefaultAerospikeFlags()
 
@@ -267,7 +274,7 @@ func (suite *ConfTestSuite) NewTestCmd() (*cobra.Command, *flags.ConfFileFlags, 
 		Run: func(cmd *cobra.Command, _ []string) {
 			_, err := config.InitConfig(configFileFlags.File, configFileFlags.Instance, cmd.Flags())
 			if err != nil {
-				suite.FailNow("Failed to initialize config", err)
+				s.FailNow("Failed to initialize config", err)
 			}
 		},
 	}
@@ -286,54 +293,54 @@ func (suite *ConfTestSuite) NewTestCmd() (*cobra.Command, *flags.ConfFileFlags, 
 	return testCmd, configFileFlags, aerospikeFlags
 }
 
-func (suite *ConfTestSuite) TestSetupRootVersion() {
-	testCmd, _, _ := suite.NewTestCmd()
+func (s *ConfTestSuite) TestSetupRootVersion() {
+	testCmd, _, _ := s.NewTestCmd()
 	testCmd.Version = "1"
 	stdout := &bytes.Buffer{}
 
 	testCmd.SetArgs([]string{"--version"})
 	testCmd.SetOut(stdout)
 
-	suite.NoError(testCmd.Execute())
+	s.NoError(testCmd.Execute())
 
-	suite.Equal("Test App\nVersion 1.1.1\nBuild g12345\n", stdout.String())
+	s.Equal("Test App\nVersion 1.1.1\nBuild g12345\n", stdout.String())
 
 	testCmd.SetArgs([]string{"-V"})
 
 	stdout = &bytes.Buffer{}
 
 	testCmd.SetOut(stdout)
-	suite.NoError(testCmd.Execute())
+	s.NoError(testCmd.Execute())
 
-	suite.Equal("Test App\nVersion 1.1.1\nBuild g12345\n", stdout.String())
+	s.Equal("Test App\nVersion 1.1.1\nBuild g12345\n", stdout.String())
 }
 
-func (suite *ConfTestSuite) TestSetupRootHelp() {
+func (s *ConfTestSuite) TestSetupRootHelp() {
 	stdout := &bytes.Buffer{}
-	testCmd, _, _ := suite.NewTestCmd()
+	testCmd, _, _ := s.NewTestCmd()
 
 	testCmd.SetArgs([]string{"-u"})
 	testCmd.SetErr(stdout)
 	testCmd.SetOut(stdout)
-	suite.NoError(testCmd.Execute())
+	s.NoError(testCmd.Execute())
 
-	suite.Equal("test cmd", strings.Split(stdout.String(), "\n")[0])
+	s.Equal("test cmd", strings.Split(stdout.String(), "\n")[0])
 
 	stdout = &bytes.Buffer{}
 
 	testCmd.SetArgs([]string{"--help"})
 	testCmd.SetErr(stdout)
 	testCmd.SetOut(stdout)
-	suite.NoError(testCmd.Execute())
+	s.NoError(testCmd.Execute())
 
-	suite.Equal("test cmd", strings.Split(stdout.String(), "\n")[0])
+	s.Equal("test cmd", strings.Split(stdout.String(), "\n")[0])
 }
 
-func (suite *ConfTestSuite) TestConfigFileDefault() {
-	testCmd, _, asFlags := suite.NewTestCmd()
+func (s *ConfTestSuite) TestConfigFileDefault() {
+	testCmd, _, asFlags := s.NewTestCmd()
 	expectedClientConf := as.NewClientPolicy()
-	expectedClientConf.User = "default-user"
-	expectedClientConf.Password = "default-password"
+	expectedClientConf.User = defaultUser
+	expectedClientConf.Password = defaultPassword
 	expectedClientConf.AuthMode = as.AuthModeExternal
 	expectedClientHosts := []*as.Host{
 		{Name: "1.1.1.1", Port: 3001},
@@ -343,40 +350,40 @@ func (suite *ConfTestSuite) TestConfigFileDefault() {
 
 	output := bytes.Buffer{}
 	testCmd.SetErr(&output)
-	testCmd.SetArgs([]string{"test", "--config-file", suite.configFile, "-p", "3003"})
-	suite.NoError(testCmd.Execute())
+	testCmd.SetArgs([]string{"test", "--config-file", s.configFile, "-p", "3003"})
+	s.NoError(testCmd.Execute())
 
 	if output.String() != "" {
-		suite.Fail("Unexpected error: %s", output.String())
+		s.Fail("Unexpected error: %s", output.String())
 	}
 
 	aerospikeConf := asFlags.NewAerospikeConfig()
 
 	actualClientConf, err := aerospikeConf.NewClientPolicy()
 
-	suite.NoError(err)
-	suite.Equal(expectedClientConf, actualClientConf)
+	s.NoError(err)
+	s.Equal(expectedClientConf, actualClientConf)
 
 	actualClientHosts := aerospikeConf.NewHosts()
-	suite.Equal(expectedClientHosts, actualClientHosts)
+	s.Equal(expectedClientHosts, actualClientHosts)
 }
 
-func (suite *ConfTestSuite) TestConfigFileTLS() {
-	testCmd, _, asFlags := suite.NewTestCmd()
+func (s *ConfTestSuite) TestConfigFileTLS() {
+	testCmd, _, asFlags := s.NewTestCmd()
 	expectedClientConf := as.NewClientPolicy()
 
 	expectedServerPool, err := x509.SystemCertPool()
 	if err != nil {
-		suite.FailNow("Failed to get system cert pool: %s", err)
+		s.FailNow("Failed to get system cert pool: %s", err)
 	}
 
-	suite.True(expectedServerPool.AppendCertsFromPEM([]byte(suite.rootCATxt)))
-	suite.True(expectedServerPool.AppendCertsFromPEM([]byte(suite.rootCATxt2)))
+	s.True(expectedServerPool.AppendCertsFromPEM([]byte(s.rootCATxt)))
+	s.True(expectedServerPool.AppendCertsFromPEM([]byte(s.rootCATxt2)))
 
-	block, _ := pem.Decode([]byte(suite.keyTxt))
+	block, _ := pem.Decode([]byte(s.keyTxt))
 
 	keyPem := pem.EncodeToMemory(block)
-	cert, _ := tls.X509KeyPair([]byte(suite.certTxt), keyPem)
+	cert, _ := tls.X509KeyPair([]byte(s.certTxt), keyPem)
 	expectedClientConf.TlsConfig = &tls.Config{
 		MinVersion:               tls.VersionTLS12,
 		MaxVersion:               tls.VersionTLS13,
@@ -389,32 +396,32 @@ func (suite *ConfTestSuite) TestConfigFileTLS() {
 		{Name: "3.3.3.3", TLSName: "tls-name", Port: 4333},
 	}
 
-	testCmd.SetArgs([]string{"test", "--config-file", suite.configFile, "--instance", "tls"})
-	suite.NoError(testCmd.Execute())
+	testCmd.SetArgs([]string{"test", "--config-file", s.configFile, "--instance", "tls"})
+	s.NoError(testCmd.Execute())
 
 	aerospikeConf := asFlags.NewAerospikeConfig()
 
 	actualClientConf, err := aerospikeConf.NewClientPolicy()
 
-	suite.NoError(err)
-	suite.Assert().True(expectedClientConf.TlsConfig.RootCAs.Equal(actualClientConf.TlsConfig.RootCAs))
-	suite.True(len(expectedClientConf.TlsConfig.Certificates) == len(actualClientConf.TlsConfig.Certificates))
-	suite.Assert().True(
+	s.NoError(err)
+	s.Assert().True(expectedClientConf.TlsConfig.RootCAs.Equal(actualClientConf.TlsConfig.RootCAs))
+	s.True(len(expectedClientConf.TlsConfig.Certificates) == len(actualClientConf.TlsConfig.Certificates))
+	s.Assert().True(
 		expectedClientConf.TlsConfig.Certificates[0].Leaf.Equal(actualClientConf.TlsConfig.Certificates[0].Leaf),
 	)
-	suite.False(expectedClientConf.TlsConfig.InsecureSkipVerify)
-	suite.Equal(expectedClientConf.TlsConfig.MinVersion, actualClientConf.TlsConfig.MinVersion)
-	suite.Equal(expectedClientConf.TlsConfig.MaxVersion, actualClientConf.TlsConfig.MaxVersion)
+	s.False(expectedClientConf.TlsConfig.InsecureSkipVerify)
+	s.Equal(expectedClientConf.TlsConfig.MinVersion, actualClientConf.TlsConfig.MinVersion)
+	s.Equal(expectedClientConf.TlsConfig.MaxVersion, actualClientConf.TlsConfig.MaxVersion)
 
 	actualClientHosts := aerospikeConf.NewHosts()
-	suite.Equal(expectedClientHosts, actualClientHosts)
+	s.Equal(expectedClientHosts, actualClientHosts)
 }
 
-func (suite *ConfTestSuite) TestConfigFileWithInstance() {
-	testCmd, _, asFlags := suite.NewTestCmd()
+func (s *ConfTestSuite) TestConfigFileWithInstance() {
+	testCmd, _, asFlags := s.NewTestCmd()
 	expectedClientConf := as.NewClientPolicy()
 	expectedClientConf.User = "test-user"
-	expectedClientConf.Password = "test-password"
+	expectedClientConf.Password = testPassword
 	expectedClientHosts := []*as.Host{
 		{Name: "3.3.3.3", Port: 3003},
 		{Name: "4.4.4.4", Port: 3004},
@@ -422,60 +429,60 @@ func (suite *ConfTestSuite) TestConfigFileWithInstance() {
 
 	output := bytes.Buffer{}
 	testCmd.SetErr(&output)
-	testCmd.SetArgs([]string{"test", "--config-file", suite.configFile, "--instance", "instance"})
-	suite.NoError(testCmd.Execute())
+	testCmd.SetArgs([]string{"test", "--config-file", s.configFile, "--instance", "instance"})
+	s.NoError(testCmd.Execute())
 
 	if output.String() != "" {
-		suite.Fail("Unexpected error: %s", output.String())
+		s.Fail("Unexpected error: %s", output.String())
 	}
 
 	aerospikeConf := asFlags.NewAerospikeConfig()
 
 	actualClientConf, err := aerospikeConf.NewClientPolicy()
 
-	suite.NoError(err)
-	suite.Equal(expectedClientConf, actualClientConf)
+	s.NoError(err)
+	s.Equal(expectedClientConf, actualClientConf)
 
 	actualClientHosts := aerospikeConf.NewHosts()
-	suite.Equal(expectedClientHosts, actualClientHosts)
+	s.Equal(expectedClientHosts, actualClientHosts)
 }
 
-func (suite *ConfTestSuite) TestConfigFileWithEnv() {
-	testCmd, _, asFlags := suite.NewTestCmd()
+func (s *ConfTestSuite) TestConfigFileWithEnv() {
+	testCmd, _, asFlags := s.NewTestCmd()
 	expectedClientConf := as.NewClientPolicy()
-	expectedClientConf.User = "env-user"
-	expectedClientConf.Password = "test-password"
+	expectedClientConf.User = envUser
+	expectedClientConf.Password = testPassword
 	expectedClientHosts := []*as.Host{
 		{Name: "5.5.5.5", TLSName: "env-tls-name", Port: 1000},
 	}
 
-	os.Setenv("AEROSPIKE_TEST", "test-password")
+	os.Setenv("AEROSPIKE_TEST", testPassword)
 
 	output := bytes.Buffer{}
 	testCmd.SetErr(&output)
-	testCmd.SetArgs([]string{"test", "--config-file", suite.configFile, "--instance", "env", "--user", "env-user"})
-	suite.NoError(testCmd.Execute())
+	testCmd.SetArgs([]string{"test", "--config-file", s.configFile, "--instance", "env", "--user", envUser})
+	s.NoError(testCmd.Execute())
 
 	if output.String() != "" {
-		suite.Fail("Unexpected error: %s", output.String())
+		s.Fail("Unexpected error: %s", output.String())
 	}
 
 	aerospikeConf := asFlags.NewAerospikeConfig()
 
 	actualClientConf, err := aerospikeConf.NewClientPolicy()
 
-	suite.NoError(err)
-	suite.Equal(expectedClientConf, actualClientConf)
+	s.NoError(err)
+	s.Equal(expectedClientConf, actualClientConf)
 
 	actualClientHosts := aerospikeConf.NewHosts()
-	suite.Equal(expectedClientHosts, actualClientHosts)
+	s.Equal(expectedClientHosts, actualClientHosts)
 }
 
-func (suite *ConfTestSuite) TestConfigFileWithEnvB64() {
-	testCmd, _, asFlags := suite.NewTestCmd()
+func (s *ConfTestSuite) TestConfigFileWithEnvB64() {
+	testCmd, _, asFlags := s.NewTestCmd()
 	expectedClientConf := as.NewClientPolicy()
-	expectedClientConf.User = "env-user"
-	expectedClientConf.Password = "test-password"
+	expectedClientConf.User = envUser
+	expectedClientConf.Password = testPassword
 	expectedClientHosts := []*as.Host{
 		{Name: "6.6.6.6", TLSName: "env-tls-name", Port: 1000},
 	}
@@ -483,29 +490,29 @@ func (suite *ConfTestSuite) TestConfigFileWithEnvB64() {
 	output := bytes.Buffer{}
 	testCmd.SetErr(&output)
 	os.Setenv("AEROSPIKE_TEST", "dGVzdC1wYXNzd29yZAo=")
-	testCmd.SetArgs([]string{"test", "--config-file", suite.configFile, "--instance", "envb64", "--user", "env-user"})
-	suite.NoError(testCmd.Execute())
+	testCmd.SetArgs([]string{"test", "--config-file", s.configFile, "--instance", "envb64", "--user", envUser})
+	s.NoError(testCmd.Execute())
 
 	if output.String() != "" {
-		suite.Fail("Unexpected error: %s", output.String())
+		s.Fail("Unexpected error: %s", output.String())
 	}
 
 	aerospikeConf := asFlags.NewAerospikeConfig()
 
 	actualClientConf, err := aerospikeConf.NewClientPolicy()
 
-	suite.NoError(err)
-	suite.Equal(expectedClientConf, actualClientConf)
+	s.NoError(err)
+	s.Equal(expectedClientConf, actualClientConf)
 
 	actualClientHosts := aerospikeConf.NewHosts()
-	suite.Equal(expectedClientHosts, actualClientHosts)
+	s.Equal(expectedClientHosts, actualClientHosts)
 }
 
-func (suite *ConfTestSuite) TestConfigFileWithB64() {
-	testCmd, _, asFlags := suite.NewTestCmd()
+func (s *ConfTestSuite) TestConfigFileWithB64() {
+	testCmd, _, asFlags := s.NewTestCmd()
 	expectedClientConf := as.NewClientPolicy()
-	expectedClientConf.User = "env-user"
-	expectedClientConf.Password = "test-password"
+	expectedClientConf.User = envUser
+	expectedClientConf.Password = testPassword
 	expectedClientHosts := []*as.Host{
 		{
 			Name:    "7.7.7.7",
@@ -516,26 +523,26 @@ func (suite *ConfTestSuite) TestConfigFileWithB64() {
 
 	output := bytes.Buffer{}
 	testCmd.SetErr(&output)
-	testCmd.SetArgs([]string{"test", "--config-file", suite.configFile, "--instance", "b64", "--user", "env-user"})
-	suite.NoError(testCmd.Execute())
+	testCmd.SetArgs([]string{"test", "--config-file", s.configFile, "--instance", "b64", "--user", envUser})
+	s.NoError(testCmd.Execute())
 
 	if output.String() != "" {
-		suite.Fail("Unexpected error: %s", output.String())
+		s.Fail("Unexpected error: %s", output.String())
 	}
 
 	aerospikeConf := asFlags.NewAerospikeConfig()
 
 	actualClientConf, err := aerospikeConf.NewClientPolicy()
 
-	suite.NoError(err)
-	suite.Equal(expectedClientConf, actualClientConf)
+	s.NoError(err)
+	s.Equal(expectedClientConf, actualClientConf)
 
 	actualClientHosts := aerospikeConf.NewHosts()
-	suite.Equal(expectedClientHosts, actualClientHosts)
+	s.Equal(expectedClientHosts, actualClientHosts)
 }
 
-func (suite *ConfTestSuite) TestConfigFileWithFile() {
-	testCmd, _, asFlags := suite.NewTestCmd()
+func (s *ConfTestSuite) TestConfigFileWithFile() {
+	testCmd, _, asFlags := s.NewTestCmd()
 	expectedClientConf := as.NewClientPolicy()
 	expectedClientConf.User = "user"
 	expectedClientConf.Password = "password-file"
@@ -549,22 +556,22 @@ func (suite *ConfTestSuite) TestConfigFileWithFile() {
 
 	output := bytes.Buffer{}
 	testCmd.SetErr(&output)
-	testCmd.SetArgs([]string{"test", "--config-file", suite.configFile, "--instance", "file", "--user", "user", "-p", "0"})
-	suite.NoError(testCmd.Execute())
+	testCmd.SetArgs([]string{"test", "--config-file", s.configFile, "--instance", "file", "--user", "user", "-p", "0"})
+	s.NoError(testCmd.Execute())
 
 	if output.String() != "" {
-		suite.Fail("Unexpected error: %s", output.String())
+		s.Fail("Unexpected error: %s", output.String())
 	}
 
 	aerospikeConf := asFlags.NewAerospikeConfig()
 
 	actualClientConf, err := aerospikeConf.NewClientPolicy()
 
-	suite.NoError(err)
-	suite.Equal(expectedClientConf, actualClientConf)
+	s.NoError(err)
+	s.Equal(expectedClientConf, actualClientConf)
 
 	actualClientHosts := aerospikeConf.NewHosts()
-	suite.Equal(expectedClientHosts, actualClientHosts)
+	s.Equal(expectedClientHosts, actualClientHosts)
 }
 
 // In order for 'go test' to run this suite, we need to create

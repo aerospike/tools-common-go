@@ -7,13 +7,20 @@ import (
 	"testing"
 )
 
+const (
+	testEnvVal       = "birdistheword"
+	testB64EnvVal    = "bHlsZWx5bGVjcm9jb2RpbGU=" // lylelylecorcodile in plaintext
+	testBadB64Val    = "BadBase64.....!"
+	testFileDataPath = "./testdata/filedata"
+)
+
 func TestCert(t *testing.T) {
 	envVar := "flag_test_cert_env"
-	envVarVal := "birdistheword"
+	envVarVal := testEnvVal
 	envVarB64 := "flag_test_cert_envb64"
-	envVarB64Val := "bHlsZWx5bGVjcm9jb2RpbGU=" // lylelylecorcodile in plaintext
+	envVarB64Val := testB64EnvVal
 	envVarB64Bad := "flag_test_cert_env_bad_b64"
-	envVarB64BadVal := "BadBase64.....!"
+	envVarB64BadVal := testBadB64Val
 
 	os.Setenv(envVar, envVarVal)
 	os.Setenv(envVarB64, envVarB64Val)
@@ -30,7 +37,7 @@ func TestCert(t *testing.T) {
 		t.Error(err.Error())
 	}
 
-	fpath := "./testdata/filedata"
+	fpath := testFileDataPath
 
 	fdata, err := os.ReadFile(fpath)
 	if err != nil {

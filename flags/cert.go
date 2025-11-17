@@ -15,14 +15,12 @@ type CertFlag []byte
 
 func (flag *CertFlag) Set(val string) error {
 	result, err := flagFormatParser(val, flagFormatB64|flagFormatEnvB64|flagFormatFile)
-
 	if err != nil {
 		return err
 	}
 
 	if result == "" {
 		resultBytes, err := readFromFile(val, true)
-
 		if err != nil {
 			return err
 		}
@@ -51,7 +49,6 @@ type CertPathFlag [][]byte
 
 func (slice *CertPathFlag) Set(val string) error {
 	resultBytes, err := readFromPath(val, true)
-
 	if err != nil {
 		return err
 	}

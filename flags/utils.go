@@ -45,7 +45,6 @@ func DefaultWrapHelpString(val string) string {
 
 func decode64(b64Val string) (string, error) {
 	byteVal, err := base64.StdEncoding.DecodeString(b64Val)
-
 	if err != nil {
 		return "", err
 	}
@@ -61,8 +60,8 @@ func decode64(b64Val string) (string, error) {
 // Read content from file
 func readFromFile(filePath string, removeTrailingNewLine bool) ([]byte, error) {
 	filePath, _ = filepath.Abs(filePath)
-	data, err := os.ReadFile(filePath)
 
+	data, err := os.ReadFile(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read from file `%s`: `%v`", filePath, err)
 	}
@@ -77,8 +76,8 @@ func readFromFile(filePath string, removeTrailingNewLine bool) ([]byte, error) {
 // Read content from path
 func readFromPath(filePath string, removeTrailingNewLine bool) ([][]byte, error) {
 	filePath, _ = filepath.Abs(filePath)
-	fileSysInfo, err := os.ReadDir(filePath)
 
+	fileSysInfo, err := os.ReadDir(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read from file `%s`: `%v`", filePath, err)
 	}
@@ -87,7 +86,6 @@ func readFromPath(filePath string, removeTrailingNewLine bool) ([][]byte, error)
 
 	for i, file := range fileSysInfo {
 		data, err := readFromFile(filepath.Join(filePath, file.Name()), removeTrailingNewLine)
-
 		if err != nil {
 			return nil, fmt.Errorf("failed to read from file `%s`: `%v`", file.Name(), err)
 		}
