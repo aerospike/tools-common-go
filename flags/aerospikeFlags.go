@@ -58,7 +58,7 @@ func (af *AerospikeFlags) NewFlagSet(fmtUsage UsageFormatter) *pflag.FlagSet {
 	f.Var(&af.TLSKeyFilePass, "tls-keyfile-password", fmtUsage("The password used to decrypt the key file if encrypted."))
 	f.Var(&af.TLSProtocols, "tls-protocols", fmtUsage(
 		"Set the TLS protocol selection criteria. This format is the same as"+
-			" Apache's SSLProtocol documented at https://httpd.apache.org/docs/current/mod/mod_ssl.html#sslprotocol .",
+			" Apache's SSLProtocol documented at https://httpd.apache.org/docs/current/mod/mod_ssl.html#sslprotocol",
 	))
 	f.BoolVar(&af.UseServicesAlternate, "services-alternate", false,
 		fmtUsage("Determines if the client should use \"services-alternate\" instead of \"services\""+
