@@ -23,7 +23,7 @@ func (flag *PasswordFlag) Set(val string) error {
 }
 
 func (flag *PasswordFlag) Type() string {
-	return "\"env-b64:<env-var>,b64:<b64-pass>,file:<pass-file>,<clear-pass>\""
+	return "\"env:<env-var>,env-b64:<env-var>,b64:<b64-pass>,file:<pass-file>,secrets:<resource>:<key>,<clear-pass>\""
 }
 
 func (flag *PasswordFlag) String() string {
