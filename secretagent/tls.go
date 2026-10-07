@@ -45,15 +45,14 @@ func NewTLSConfig(opts TLSOptions) (*tls.Config, error) {
 		return nil, fmt.Errorf("%w: no certificates found in TLS CA file %s", ErrInvalidConfig, opts.CAFile)
 	}
 
-	minVersion := opts.MinVersion
-	if minVersion == 0 {
-		minVersion = tls.VersionTLS12
-	}
-
 	cfg := &tls.Config{
 		RootCAs:    roots,
 		ServerName: opts.ServerName,
-		MinVersion: minVersion,
+		MinVersion: tls.VersionTLS12,
+	}
+
+	if opts.MinVersion != 0 {
+		cfg.MinVersion = opts.MinVersion
 	}
 
 	if opts.CertFile != "" {

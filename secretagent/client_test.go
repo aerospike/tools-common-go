@@ -184,20 +184,20 @@ func TestResolve(t *testing.T) {
 	})
 	client := newClient(t, agentConfig(agent))
 
-	tests := map[string]string{ //nolint:gosec // test fixtures, not credentials
-		literal:           literal,
-		"":                "",
-		"env:HOME":        "env:HOME",
-		"file:/etc/hosts": "file:/etc/hosts",
-		testRef:           testSecret,
-		"secrets:bare":    bareSecret,
-		"secrets:res:env": "env:NOT_EXPANDED",
+	tests := []struct{ value, want string }{
+		{value: literal, want: literal},
+		{value: "", want: ""},
+		{value: "env:HOME", want: "env:HOME"},
+		{value: "file:/etc/hosts", want: "file:/etc/hosts"},
+		{value: testRef, want: testSecret},
+		{value: "secrets:bare", want: bareSecret},
+		{value: "secrets:res:env", want: "env:NOT_EXPANDED"},
 	}
 
-	for value, want := range tests {
-		got, err := client.Resolve(t.Context(), value)
-		require.NoError(t, err, value)
-		require.Equal(t, want, got, value)
+	for _, tt := range tests {
+		got, err := client.Resolve(t.Context(), tt.value)
+		require.NoError(t, err, tt.value)
+		require.Equal(t, tt.want, got, tt.value)
 	}
 
 	_, err := client.Resolve(t.Context(), "secrets:res:")
