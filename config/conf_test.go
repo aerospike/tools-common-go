@@ -329,6 +329,63 @@ func (s *ConfigTestSuite) TestInitConfigWithFlagsDefaults() {
 	s.Equal(s.actualCfgFile, s.file)
 }
 
+func (s *ConfigTestSuite) TestInitConfigInstanceFallback() {
+	rootCmd, cmd1, _ := s.NewCmds(s.file, "instance")
+
+	flagSet := &pflag.FlagSet{}
+	flagSet.String("str", "", "string flag")
+	flagSet.Int("int", 0, "int flag")
+	flagSet.Bool("bool", false, "bool flag")
+	BindPFlagsWithInstanceFallback(flagSet, "group1")
+
+	flagSet2 := &pflag.FlagSet{}
+	flagSet2.String("str2", "", "string flag")
+	flagSet2.Int("int2", 0, "int flag")
+	flagSet2.Bool("bool2", true, "bool flag")
+	BindPFlagsWithInstanceFallback(flagSet2, "group2")
+
+	cmd1.Flags().AddFlagSet(flagSet)
+	cmd1.Flags().AddFlagSet(flagSet2)
+
+	rootCmd.SetArgs([]string{"test1"})
+	s.NoError(rootCmd.Execute())
+
+	// group1_instance exists, so it replaces group1.
+	str, err := cmd1.Flags().GetString("str")
+	s.NoError(err)
+	s.Equal("localhost:3000 instance", str)
+
+	// group2_instance does not exist, so group2 is read.
+	str, err = cmd1.Flags().GetString("str2")
+	s.NoError(err)
+	s.Equal("localhost:4000", str)
+
+	intVal, err := cmd1.Flags().GetInt("int2")
+	s.NoError(err)
+	s.Equal(4000, intVal)
+
+	boolVal, err := cmd1.Flags().GetBool("bool2")
+	s.NoError(err)
+	s.False(boolVal)
+}
+
+func (s *ConfigTestSuite) TestInitConfigInstanceWithoutFallback() {
+	rootCmd, cmd1, _ := s.NewCmds(s.file, "instance")
+
+	flagSet := &pflag.FlagSet{}
+	flagSet.String("str2", "default", "string flag")
+	BindPFlags(flagSet, "group2")
+
+	cmd1.Flags().AddFlagSet(flagSet)
+
+	rootCmd.SetArgs([]string{"test1"})
+	s.NoError(rootCmd.Execute())
+
+	str, err := cmd1.Flags().GetString("str2")
+	s.NoError(err)
+	s.Equal("default", str)
+}
+
 func TestRunConfigTestSuite(t *testing.T) {
 	files := []struct {
 		file    string

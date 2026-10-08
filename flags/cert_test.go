@@ -95,6 +95,18 @@ func TestCert(t *testing.T) {
 			output:  CertFlag(fdata),
 			wantErr: false,
 		},
+		{
+			name:    "t8",
+			input:   "secrets:tls:ca",
+			output:  CertFlag("secrets:tls:ca"),
+			wantErr: false,
+		},
+		{
+			name:    "t9",
+			input:   "filedoesnotexist.pem",
+			output:  CertFlag(""),
+			wantErr: true,
+		},
 	}
 
 	for _, tc := range testCases {

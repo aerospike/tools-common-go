@@ -27,4 +27,21 @@ jobs:
         token: ${{secrets.CODECOV_TOKEN}}
         files: coverage.cov
         verbose: false
+
+  secretagent-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+    - name: Harden the runner (Audit all outbound calls)
+      uses: step-security/harden-runner@df199fb7be9f65074067a9eb93f12bb4c5547cf2 # v2.13.3
+      with:
+        egress-policy: audit
+
+    - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+    - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6.5.0
+      with:
+        go-version-file: go.mod
+    - name: Secret Agent end-to-end tests
+      run: |
+        make test-e2e
         

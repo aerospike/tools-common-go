@@ -39,7 +39,8 @@ func (af *AerospikeFlags) NewFlagSet(fmtUsage UsageFormatter) *pflag.FlagSet {
 	f := &pflag.FlagSet{}
 	f.VarP(&af.Seeds, "host", "h", fmtUsage("The Aerospike host."))
 	f.IntVarP(&af.DefaultPort, "port", "p", DefaultPort, fmtUsage("The default Aerospike port."))
-	f.StringVarP(&af.User, "user", "U", "", fmtUsage("The Aerospike user for the connection to the Aerospike cluster."))
+	f.StringVarP(&af.User, "user", "U", "", fmtUsage("The Aerospike user for the connection to the Aerospike cluster."+
+		" A secrets:<resource>:<key> value is fetched from the Secret Agent."))
 	f.VarP(&af.Password, "password", "P", fmtUsage("The Aerospike password for the connection to the Aerospike cluster."))
 	f.Var(&af.AuthMode, "auth", fmtUsage("The authentication mode used by the Aerospike server."+
 		" INTERNAL uses standard user/pass. EXTERNAL uses external methods (like LDAP)"+
