@@ -44,6 +44,24 @@ func TestEncodeTooLarge(t *testing.T) {
 	require.ErrorIs(t, err, ErrTooLarge)
 }
 
+func TestDecode(t *testing.T) {
+	t.Parallel()
+
+	var res Response
+	require.NoError(t, decode([]byte(`{"SecretValue":"value"}`), &res))
+	require.Equal(t, Response{SecretValue: "value"}, res)
+}
+
+func TestDecodeMalformed(t *testing.T) {
+	t.Parallel()
+
+	var res Response
+
+	err := decode([]byte(`{"SecretValue":"hunter2`), &res)
+	require.ErrorIs(t, err, ErrProtocol)
+	require.NotContains(t, err.Error(), "hunter2")
+}
+
 func TestRoundTrip(t *testing.T) {
 	t.Parallel()
 

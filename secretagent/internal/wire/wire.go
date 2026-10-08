@@ -85,6 +85,11 @@ func Read(r io.Reader, v any) error {
 		return fmt.Errorf("read body: %w", err)
 	}
 
+	return decode(body, v)
+}
+
+// decode unmarshals one message body into v.
+func decode(body []byte, v any) error {
 	if err := json.Unmarshal(body, v); err != nil {
 		return fmt.Errorf("%w: malformed JSON body", ErrProtocol)
 	}
