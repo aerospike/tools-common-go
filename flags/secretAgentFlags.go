@@ -21,7 +21,7 @@ type SecretAgentFlags struct {
 	flagSet *pflag.FlagSet
 	Address string `mapstructure:"sa-address"`
 	Port    string `mapstructure:"sa-port"`
-	CAFile  string `mapstructure:"sa-cafile"`
+	CAFile  string `mapstructure:"sa-ca-file"`
 	Timeout int    `mapstructure:"sa-timeout"`
 }
 
@@ -39,7 +39,7 @@ func (sf *SecretAgentFlags) NewFlagSet(fmtUsage UsageFormatter) *pflag.FlagSet {
 		" (default 3005)"))
 	f.IntVar(&sf.Timeout, "sa-timeout", defaultSecretAgentTimeoutMs, fmtUsage("The Secret Agent timeout in"+
 		" milliseconds, 1 or more. It covers the name lookup, the connection, the TLS handshake and the request."))
-	f.StringVar(&sf.CAFile, "sa-cafile", "", fmtUsage("A CA certificate file. Enables TLS to the Secret Agent"+
+	f.StringVar(&sf.CAFile, "sa-ca-file", "", fmtUsage("A CA certificate file. Enables TLS to the Secret Agent"+
 		" and verifies its certificate against this CA."))
 
 	sf.flagSet = f
@@ -63,7 +63,7 @@ func (sf *SecretAgentFlags) NewClient() (*secretagent.Client, error) {
 	}
 
 	if cfg.TLS, err = secretagent.NewTLSConfig(secretagent.TLSOptions{CAFile: sf.CAFile}); err != nil {
-		return nil, fmt.Errorf("--sa-cafile: %w", err)
+		return nil, fmt.Errorf("--sa-ca-file: %w", err)
 	}
 
 	return secretagent.NewClient(cfg)

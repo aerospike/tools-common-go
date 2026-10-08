@@ -155,7 +155,7 @@ func TestSecretAgentFlagSet(t *testing.T) {
 	fs := sa.NewFlagSet(DefaultWrapHelpString)
 
 	require.NoError(t, fs.Parse([]string{
-		"--sa-address", "agent", "--sa-port", "4000", "--sa-timeout", "250", "--sa-cafile", "/ca.pem",
+		"--sa-address", "agent", "--sa-port", "4000", "--sa-timeout", "250", "--sa-ca-file", "/ca.pem",
 	}))
 	require.Equal(t, "agent", sa.Address)
 	require.Equal(t, "4000", sa.Port)

@@ -90,7 +90,7 @@ func TestResolveSecretsTLS(t *testing.T) {
 	agent := secretagenttest.NewTLSServer(t, secretagenttest.Secrets{"aql": {"password": encode(resolvedPassword)}})
 
 	af, sa := parseToolFlags(t,
-		"-U", "admin", "-P", "secrets:aql:password", "--sa-address", agent.Addr(), "--sa-cafile", agent.CAFile(),
+		"-U", "admin", "-P", "secrets:aql:password", "--sa-address", agent.Addr(), "--sa-ca-file", agent.CAFile(),
 	)
 	require.NoError(t, af.ResolveSecrets(t.Context(), sa))
 	require.Equal(t, resolvedPassword, string(af.Password))
@@ -154,9 +154,9 @@ func TestResolveSecretsErrors(t *testing.T) {
 		},
 		"bad CA file": {
 			args: []string{
-				"-U", "admin", "-P", "secrets:aql:password", "--sa-address", agent.Addr(), "--sa-cafile", "/missing.pem",
+				"-U", "admin", "-P", "secrets:aql:password", "--sa-address", agent.Addr(), "--sa-ca-file", "/missing.pem",
 			},
-			want:  []string{"--sa-cafile: "},
+			want:  []string{"--sa-ca-file: "},
 			class: secretagent.ErrInvalidConfig,
 		},
 	}
