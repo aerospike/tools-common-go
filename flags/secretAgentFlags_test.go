@@ -148,6 +148,43 @@ func TestSecretAgentFlagsValidate(t *testing.T) {
 	require.NoError(t, NewDefaultSecretAgentFlags().Validate())
 }
 
+func TestSecretAgentNewClientInvalid(t *testing.T) {
+	t.Parallel()
+
+	tests := map[string]struct {
+		want string
+		args []string
+	}{
+		"address": {args: []string{"--sa-address", "host:"}, want: "--sa-address: invalid value host:"},
+		"timeout": {args: []string{"--sa-timeout", "0"}, want: "--sa-timeout: invalid value 0"},
+		"CA file": {args: []string{"--sa-ca-file", "/missing.pem"}, want: "--sa-ca-file: "},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			client, err := parseSecretAgentFlags(t, tt.args, nil).NewClient()
+			require.ErrorContains(t, err, tt.want)
+			require.Nil(t, client)
+		})
+	}
+}
+
+func TestSecretAgentFlagsWithoutFlagSet(t *testing.T) {
+	t.Parallel()
+
+	sa := &SecretAgentFlags{Address: "agent:4000", Port: "5000", Timeout: 250}
+
+	address, err := sa.address()
+	require.NoError(t, err)
+	require.Equal(t, "agent:5000", address)
+
+	client, err := sa.NewClient()
+	require.NoError(t, err)
+	require.NotNil(t, client)
+}
+
 func TestSecretAgentFlagSet(t *testing.T) {
 	t.Parallel()
 

@@ -8,6 +8,7 @@ import (
 	"io"
 	"net"
 	"path/filepath"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -173,6 +174,17 @@ func TestGetSecret(t *testing.T) {
 
 	_, err = client.GetSecret(t.Context(), testResource, "")
 	requireClass(t, err, secretagent.ErrInvalidConfig)
+}
+
+func TestRequestTooLarge(t *testing.T) {
+	t.Parallel()
+
+	agent := secretagenttest.NewServer(t, secretagenttest.Secrets{testResource: {testKey: testSecret}})
+	client := newClient(t, agentConfig(agent))
+
+	_, err := client.GetSecret(t.Context(), testResource, strings.Repeat("k", wire.MaxMessageSize))
+	requireClass(t, err, secretagent.ErrInvalidConfig)
+	require.ErrorIs(t, err, wire.ErrTooLarge)
 }
 
 func TestResolve(t *testing.T) {

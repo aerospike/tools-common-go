@@ -2,6 +2,8 @@ package secretagent
 
 import (
 	"crypto/tls"
+	"io"
+	"net"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -30,4 +32,19 @@ func TestNewClientCopiesTLSConfig(t *testing.T) {
 	cfg.ServerName = "changed"
 
 	require.Equal(t, "agent", c.tlsConfig.ServerName)
+}
+
+func TestExchangeSendFailure(t *testing.T) {
+	t.Parallel()
+
+	conn, peer := net.Pipe()
+	require.NoError(t, peer.Close())
+
+	t.Cleanup(func() { _ = conn.Close() })
+
+	_, err := exchange(conn, Ref{Resource: "res", Key: "key"})
+	require.ErrorIs(t, err, ErrRequestFailed)
+	require.ErrorIs(t, err, io.ErrClosedPipe)
+	require.NotErrorIs(t, err, ErrInvalidConfig)
+	require.ErrorContains(t, err, "send request for secrets:res:key")
 }

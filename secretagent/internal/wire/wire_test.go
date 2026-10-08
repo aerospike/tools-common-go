@@ -44,6 +44,30 @@ func TestEncodeTooLarge(t *testing.T) {
 	require.ErrorIs(t, err, ErrTooLarge)
 }
 
+func TestWriteNothingOnEncodeError(t *testing.T) {
+	t.Parallel()
+
+	var buf bytes.Buffer
+
+	err := Write(&buf, Request{SecretKey: strings.Repeat("k", MaxMessageSize)})
+	require.ErrorIs(t, err, ErrTooLarge)
+	require.Zero(t, buf.Len())
+}
+
+type failingWriter struct{}
+
+func (failingWriter) Write([]byte) (int, error) {
+	return 0, io.ErrClosedPipe
+}
+
+func TestWriteReturnsWriterError(t *testing.T) {
+	t.Parallel()
+
+	err := Write(failingWriter{}, Request{SecretKey: "key"})
+	require.ErrorIs(t, err, io.ErrClosedPipe)
+	require.NotErrorIs(t, err, ErrProtocol)
+}
+
 func TestDecode(t *testing.T) {
 	t.Parallel()
 
