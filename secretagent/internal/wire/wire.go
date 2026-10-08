@@ -32,8 +32,8 @@ type Response struct {
 	Error       string `json:"Error,omitempty"`
 }
 
-// Encode returns v as one framed message.
-func Encode(v any) ([]byte, error) {
+// encode returns v as one framed message.
+func encode(v any) ([]byte, error) {
 	body, err := json.Marshal(v)
 	if err != nil {
 		return nil, err
@@ -52,7 +52,7 @@ func Encode(v any) ([]byte, error) {
 
 // Write encodes v and writes it to w as one framed message.
 func Write(w io.Writer, v any) error {
-	msg, err := Encode(v)
+	msg, err := encode(v)
 	if err != nil {
 		return err
 	}

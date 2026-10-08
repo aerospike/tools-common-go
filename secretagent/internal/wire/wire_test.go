@@ -22,7 +22,7 @@ func frame(magic uint32, size int, body string) []byte {
 func TestEncode(t *testing.T) {
 	t.Parallel()
 
-	msg, err := Encode(Request{Resource: "res", SecretKey: "key"})
+	msg, err := encode(Request{Resource: "res", SecretKey: "key"})
 	require.NoError(t, err)
 
 	body := `{"Resource":"res","SecretKey":"key"}`
@@ -32,7 +32,7 @@ func TestEncode(t *testing.T) {
 func TestEncodeOmitsEmptyResource(t *testing.T) {
 	t.Parallel()
 
-	msg, err := Encode(Request{SecretKey: "key"})
+	msg, err := encode(Request{SecretKey: "key"})
 	require.NoError(t, err)
 	require.Equal(t, `{"SecretKey":"key"}`, string(msg[HeaderSize:]))
 }
@@ -40,7 +40,7 @@ func TestEncodeOmitsEmptyResource(t *testing.T) {
 func TestEncodeTooLarge(t *testing.T) {
 	t.Parallel()
 
-	_, err := Encode(Request{SecretKey: strings.Repeat("k", MaxMessageSize)})
+	_, err := encode(Request{SecretKey: strings.Repeat("k", MaxMessageSize)})
 	require.ErrorIs(t, err, ErrTooLarge)
 }
 
