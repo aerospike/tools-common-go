@@ -95,6 +95,12 @@ func TestCert(t *testing.T) {
 			output:  CertFlag(fdata),
 			wantErr: false,
 		},
+		{
+			name:    "t8",
+			input:   "secrets:tls:ca",
+			output:  CertFlag("secrets:tls:ca"),
+			wantErr: false,
+		},
 	}
 
 	for _, tc := range testCases {
