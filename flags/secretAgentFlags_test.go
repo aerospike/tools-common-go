@@ -1,6 +1,7 @@
 package flags
 
 import (
+	"bytes"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -120,6 +121,64 @@ func TestSecretAgentAddressPrecedence(t *testing.T) {
 			require.Equal(t, tt.want, address)
 		})
 	}
+}
+
+func TestSecretAgentCAFilePrecedence(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		config map[string]string
+		name   string
+		want   string
+		args   []string
+	}{
+		{name: "none"},
+		{name: "command line C spelling", args: []string{"--sa-cafile", "/c.pem"}, want: "/c.pem"},
+		{name: "config C spelling", config: map[string]string{"sa-cafile": "/c.pem"}, want: "/c.pem"},
+		{
+			name: "command line: --sa-ca-file beats --sa-cafile",
+			args: []string{"--sa-cafile", "/c.pem", "--sa-ca-file", "/go.pem"},
+			want: "/go.pem",
+		},
+		{
+			name:   "config: sa-ca-file beats sa-cafile",
+			config: map[string]string{"sa-ca-file": "/go.pem", "sa-cafile": "/c.pem"},
+			want:   "/go.pem",
+		},
+		{
+			name:   "command line --sa-ca-file beats config sa-cafile",
+			args:   []string{"--sa-ca-file", "/cli.pem"},
+			config: map[string]string{"sa-cafile": "/conf.pem"},
+			want:   "/cli.pem",
+		},
+		{
+			name:   "command line --sa-cafile beats config sa-ca-file",
+			args:   []string{"--sa-cafile", "/cli.pem"},
+			config: map[string]string{"sa-ca-file": "/conf.pem"},
+			want:   "/cli.pem",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+
+			require.Equal(t, tt.want, parseSecretAgentFlags(t, tt.args, tt.config).caFile())
+		})
+	}
+}
+
+func TestSecretAgentCAFileCSpellingDeprecated(t *testing.T) {
+	t.Parallel()
+
+	var out bytes.Buffer
+
+	fs := NewDefaultSecretAgentFlags().NewFlagSet(DefaultWrapHelpString)
+	fs.SetOutput(&out)
+
+	require.True(t, fs.Lookup("sa-cafile").Hidden)
+	require.NoError(t, fs.Parse([]string{"--sa-cafile", "/c.pem"}))
+	require.Contains(t, out.String(), "--sa-cafile has been deprecated, use --sa-ca-file instead")
 }
 
 func TestSecretAgentFlagsValidate(t *testing.T) {

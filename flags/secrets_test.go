@@ -119,12 +119,12 @@ func TestResolveSecretsTLSFiles(t *testing.T) {
 	require.NoError(t, err)
 }
 
-func TestResolveSecretsFromConfigFile(t *testing.T) {
-	agent := newTestAgent(t)
+// parseToolConfig reads conf as the config file of a tool with no command line
+// arguments, with [cluster] and [secret-agent] bound as a tool's command does.
+func parseToolConfig(t *testing.T, conf string) (*AerospikeFlags, *SecretAgentFlags) {
+	t.Helper()
 
 	file := filepath.Join(t.TempDir(), "astools.conf")
-	conf := fmt.Sprintf("[cluster]\nuser = %q\npassword = %q\ntls-cafile = %q\n\n[secret-agent]\nsa-address = %q\n",
-		"secrets:aql:user", "secrets:aql:password", "secrets:aql:ca", agent.Addr())
 	require.NoError(t, os.WriteFile(file, []byte(conf), 0o600))
 
 	config.Reset()
@@ -145,10 +145,31 @@ func TestResolveSecretsFromConfigFile(t *testing.T) {
 	_, err := config.InitConfig(file, "", fs)
 	require.NoError(t, err)
 
+	return af, sa
+}
+
+func TestResolveSecretsFromConfigFile(t *testing.T) {
+	agent := newTestAgent(t)
+
+	af, sa := parseToolConfig(t, fmt.Sprintf(
+		"[cluster]\nuser = %q\npassword = %q\ntls-cafile = %q\n\n[secret-agent]\nsa-address = %q\n",
+		"secrets:aql:user", "secrets:aql:password", "secrets:aql:ca", agent.Addr()))
+
 	require.NoError(t, af.ResolveSecrets(t.Context(), sa))
 	require.Equal(t, resolvedUser, af.User)
 	require.Equal(t, resolvedPassword, string(af.Password))
 	require.Equal(t, resolvedCA, string(af.TLSRootCAFile))
+}
+
+func TestResolveSecretsFromConfigFileCSpellingCAFile(t *testing.T) {
+	agent := secretagenttest.NewTLSServer(t, secretagenttest.Secrets{"aql": {"password": encode(resolvedPassword)}})
+
+	af, sa := parseToolConfig(t, fmt.Sprintf(
+		"[cluster]\nuser = %q\npassword = %q\n\n[secret-agent]\nsa-address = %q\nsa-cafile = %q\n",
+		"admin", "secrets:aql:password", agent.Addr(), agent.CAFile()))
+
+	require.NoError(t, af.ResolveSecrets(t.Context(), sa))
+	require.Equal(t, resolvedPassword, string(af.Password))
 }
 
 func TestResolveSecretsOptionOrder(t *testing.T) {
@@ -227,28 +248,8 @@ func TestResolveSecretsExpandedValuesStayLiteral(t *testing.T) {
 func TestResolveSecretsExpandedConfigValueStaysLiteral(t *testing.T) {
 	const expanded = "secrets:" + resolvedPassword
 
-	file := filepath.Join(t.TempDir(), "astools.conf")
-	conf := fmt.Sprintf("[cluster]\nuser = %q\npassword = %q\n\n[secret-agent]\nsa-address = %q\n",
-		"lit", "b64:"+encode(expanded), unreachableAgent)
-	require.NoError(t, os.WriteFile(file, []byte(conf), 0o600))
-
-	config.Reset()
-	t.Cleanup(config.Reset)
-
-	af := NewDefaultAerospikeFlags()
-	sa := NewDefaultSecretAgentFlags()
-
-	fs := af.NewFlagSet(DefaultWrapHelpString)
-	config.BindPFlags(fs, "cluster")
-
-	saFlags := sa.NewFlagSet(DefaultWrapHelpString)
-	config.BindPFlagsWithInstanceFallback(saFlags, "secret-agent")
-	fs.AddFlagSet(saFlags)
-
-	require.NoError(t, fs.Parse(nil))
-
-	_, err := config.InitConfig(file, "", fs)
-	require.NoError(t, err)
+	af, sa := parseToolConfig(t, fmt.Sprintf("[cluster]\nuser = %q\npassword = %q\n\n[secret-agent]\nsa-address = %q\n",
+		"lit", "b64:"+encode(expanded), unreachableAgent))
 
 	require.NoError(t, af.ResolveSecrets(t.Context(), sa))
 	require.Equal(t, expanded, string(af.Password))

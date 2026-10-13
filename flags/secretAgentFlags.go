@@ -18,11 +18,12 @@ const defaultSecretAgentTimeoutMs = 1000
 // flags returned by NewFlagSet. They match the --sa-* options of the Aerospike
 // C tools and are read from the [secret-agent] config section.
 type SecretAgentFlags struct {
-	flagSet *pflag.FlagSet
-	Address string `mapstructure:"sa-address"`
-	Port    string `mapstructure:"sa-port"`
-	CAFile  string `mapstructure:"sa-ca-file"`
-	Timeout int    `mapstructure:"sa-timeout"`
+	flagSet      *pflag.FlagSet
+	Address      string `mapstructure:"sa-address"`
+	Port         string `mapstructure:"sa-port"`
+	CAFile       string `mapstructure:"sa-ca-file"`
+	legacyCAFile string
+	Timeout      int `mapstructure:"sa-timeout"`
 }
 
 func NewDefaultSecretAgentFlags() *SecretAgentFlags {
@@ -41,6 +42,8 @@ func (sf *SecretAgentFlags) NewFlagSet(fmtUsage UsageFormatter) *pflag.FlagSet {
 		" milliseconds, 1 or more. It covers the name lookup, the connection, the TLS handshake and the request."))
 	f.StringVar(&sf.CAFile, "sa-ca-file", "", fmtUsage("A CA certificate file. Enables TLS to the Secret Agent"+
 		" and verifies its certificate against this CA."))
+	f.StringVar(&sf.legacyCAFile, "sa-cafile", "", fmtUsage("Same as --sa-ca-file, as spelled by the asbackup/asrestore tools."))
+	_ = f.MarkDeprecated("sa-cafile", "use --sa-ca-file instead")
 
 	sf.flagSet = f
 
@@ -62,11 +65,22 @@ func (sf *SecretAgentFlags) NewClient() (*secretagent.Client, error) {
 		return nil, err
 	}
 
-	if cfg.TLS, err = secretagent.NewTLSConfig(secretagent.TLSOptions{CAFile: sf.CAFile}); err != nil {
+	if cfg.TLS, err = secretagent.NewTLSConfig(secretagent.TLSOptions{CAFile: sf.caFile()}); err != nil {
 		return nil, fmt.Errorf("--sa-ca-file: %w", err)
 	}
 
 	return secretagent.NewClient(cfg)
+}
+
+// caFile merges --sa-ca-file and --sa-cafile, the C tools' spelling that a
+// config file shared with them must use: the command line beats the config
+// file, and --sa-ca-file beats --sa-cafile from the same source.
+func (sf *SecretAgentFlags) caFile() string {
+	if sf.changed("sa-ca-file") || (!sf.changed("sa-cafile") && sf.CAFile != "") {
+		return sf.CAFile
+	}
+
+	return sf.legacyCAFile
 }
 
 func (sf *SecretAgentFlags) config() (secretagent.Config, error) {
