@@ -67,6 +67,14 @@ func (af *AerospikeFlags) NewFlagSet(fmtUsage UsageFormatter) *pflag.FlagSet {
 			" in info request during cluster tending."),
 	)
 
+	return f
+}
+
+// NewFlagSetWithSecrets is like NewFlagSet, but secrets:[<resource>:]<key>
+// values of --user, --password and the TLS file and password options are kept
+// as references for ResolveSecrets.
+func (af *AerospikeFlags) NewFlagSetWithSecrets(fmtUsage UsageFormatter) *pflag.FlagSet {
+	f := af.NewFlagSet(fmtUsage)
 	af.trackSecretRefs(f)
 
 	return f

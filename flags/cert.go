@@ -2,8 +2,6 @@ package flags
 
 import (
 	"strings"
-
-	"github.com/aerospike/tools-common-go/secretagent"
 )
 
 // CertFlag defines a Cobra compatible flag for
@@ -13,17 +11,9 @@ import (
 // --tls-cafile
 // --tls-certfile
 // --tls-keyfile
-// A secrets: value is stored as is until AerospikeFlags.ResolveSecrets
-// fetches it.
 type CertFlag []byte
 
 func (flag *CertFlag) Set(val string) error {
-	if secretagent.IsSecret(val) {
-		*flag = CertFlag(val)
-
-		return nil
-	}
-
 	result, err := flagFormatParser(val, flagFormatB64|flagFormatEnvB64|flagFormatFile)
 	if err != nil {
 		return err

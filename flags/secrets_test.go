@@ -60,7 +60,7 @@ func parseToolFlags(t *testing.T, args ...string) (*AerospikeFlags, *SecretAgent
 	af := NewDefaultAerospikeFlags()
 	sa := NewDefaultSecretAgentFlags()
 
-	fs := af.NewFlagSet(DefaultWrapHelpString)
+	fs := af.NewFlagSetWithSecrets(DefaultWrapHelpString)
 	fs.AddFlagSet(sa.NewFlagSet(DefaultWrapHelpString))
 	require.NoError(t, fs.Parse(args))
 
@@ -133,7 +133,7 @@ func parseToolConfig(t *testing.T, conf string) (*AerospikeFlags, *SecretAgentFl
 	af := NewDefaultAerospikeFlags()
 	sa := NewDefaultSecretAgentFlags()
 
-	fs := af.NewFlagSet(DefaultWrapHelpString)
+	fs := af.NewFlagSetWithSecrets(DefaultWrapHelpString)
 	config.BindPFlags(fs, "cluster")
 
 	saFlags := sa.NewFlagSet(DefaultWrapHelpString)
@@ -265,6 +265,32 @@ func TestResolveSecretsTLS(t *testing.T) {
 	)
 	require.NoError(t, af.ResolveSecrets(t.Context(), sa))
 	require.Equal(t, resolvedPassword, string(af.Password))
+}
+
+func TestResolveSecretsNeedsFlagSetWithSecrets(t *testing.T) {
+	t.Parallel()
+
+	af := NewDefaultAerospikeFlags()
+	require.NoError(t, af.NewFlagSet(DefaultWrapHelpString).Parse([]string{"-U", "admin", "-P", "admin"}))
+	require.ErrorIs(t, af.ResolveSecrets(t.Context(), NewDefaultSecretAgentFlags()), errSecretsNotTracked)
+}
+
+// Tools that resolve secrets themselves wrap these flag values by type, so
+// NewFlagSet must keep the original types.
+func TestNewFlagSetKeepsFlagValueTypes(t *testing.T) {
+	t.Parallel()
+
+	fs := NewDefaultAerospikeFlags().NewFlagSet(DefaultWrapHelpString)
+
+	for _, name := range []string{"tls-cafile", "tls-certfile", "tls-keyfile"} {
+		require.IsType(t, (*CertFlag)(nil), fs.Lookup(name).Value, name)
+	}
+
+	for _, name := range []string{"password", "tls-keyfile-password"} {
+		require.IsType(t, (*PasswordFlag)(nil), fs.Lookup(name).Value, name)
+	}
+
+	require.Error(t, fs.Parse([]string{"--tls-cafile", "secrets:tls:ca"}))
 }
 
 func TestResolveSecretsSkipsAgent(t *testing.T) {

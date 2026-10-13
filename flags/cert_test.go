@@ -97,12 +97,6 @@ func TestCert(t *testing.T) {
 		},
 		{
 			name:    "t8",
-			input:   "secrets:tls:ca",
-			output:  CertFlag("secrets:tls:ca"),
-			wantErr: false,
-		},
-		{
-			name:    "t9",
 			input:   "filedoesnotexist.pem",
 			output:  CertFlag(""),
 			wantErr: true,
