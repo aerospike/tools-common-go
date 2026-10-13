@@ -42,8 +42,7 @@ func (sf *SecretAgentFlags) NewFlagSet(fmtUsage UsageFormatter) *pflag.FlagSet {
 		" milliseconds, 1 or more. It covers the name lookup, the connection, the TLS handshake and the request."))
 	f.StringVar(&sf.CAFile, "sa-ca-file", "", fmtUsage("A CA certificate file. Enables TLS to the Secret Agent"+
 		" and verifies its certificate against this CA. The certificate must match the --sa-address host."))
-	f.StringVar(&sf.legacyCAFile, "sa-cafile", "", fmtUsage("Same as --sa-ca-file,"+
-		" as spelled by the asbackup/asrestore tools."))
+	f.StringVar(&sf.legacyCAFile, "sa-cafile", "", fmtUsage("Same as --sa-ca-file."))
 	_ = f.MarkDeprecated("sa-cafile", "use --sa-ca-file instead")
 
 	sf.flagSet = f
