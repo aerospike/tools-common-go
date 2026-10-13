@@ -38,6 +38,7 @@ func newTestAgent(t *testing.T) *secretagenttest.Server {
 			"keypass":  encode(resolvedKeyPass),
 			"ca":       encode(resolvedCA),
 			"envlike":  encode("env:HOME"),
+			"reflike":  encode("secrets:aql:password"),
 		},
 	})
 }
@@ -168,6 +169,89 @@ func TestResolveSecretsUsesValueAsIs(t *testing.T) {
 	af, sa := parseToolFlags(t, "-U", "admin", "-P", "secrets:aql:envlike", "--sa-address", agent.Addr())
 	require.NoError(t, af.ResolveSecrets(t.Context(), sa))
 	require.Equal(t, "env:HOME", string(af.Password))
+}
+
+func TestResolveSecretsResolvesOnce(t *testing.T) {
+	t.Parallel()
+
+	agent := newTestAgent(t)
+
+	af, sa := parseToolFlags(t, "-U", "admin", "-P", "secrets:aql:reflike", "--sa-address", agent.Addr())
+	require.NoError(t, af.ResolveSecrets(t.Context(), sa))
+	require.NoError(t, af.ResolveSecrets(t.Context(), sa))
+	require.Equal(t, "secrets:aql:password", string(af.Password))
+}
+
+func TestResolveSecretsExpandedValuesStayLiteral(t *testing.T) {
+	const expanded = "secrets:" + resolvedPassword
+
+	t.Setenv("TCG_TEST_SECRET_REF", expanded)
+	t.Setenv("TCG_TEST_SECRET_REF_B64", encode(expanded))
+
+	file := filepath.Join(t.TempDir(), "password")
+	require.NoError(t, os.WriteFile(file, []byte(expanded+"\n"), 0o600))
+
+	password := func(af *AerospikeFlags) string { return string(af.Password) }
+
+	tests := map[string]struct {
+		got  func(*AerospikeFlags) string
+		args []string
+	}{
+		"b64":     {args: []string{"-U", "lit", "-P", "b64:" + encode(expanded)}, got: password},
+		"env":     {args: []string{"-U", "lit", "-P", "env:TCG_TEST_SECRET_REF"}, got: password},
+		"env-b64": {args: []string{"-U", "lit", "-P", "env-b64:TCG_TEST_SECRET_REF_B64"}, got: password},
+		"file":    {args: []string{"-U", "lit", "-P", "file:" + file}, got: password},
+		"later literal": {
+			args: []string{"-U", "lit", "-P", "secrets:aql:password", "-P", "b64:" + encode(expanded)},
+			got:  password,
+		},
+		"key file password": {
+			args: []string{"--tls-keyfile", "file:" + testFileDataPath, "--tls-keyfile-password", "b64:" + encode(expanded)},
+			got:  func(af *AerospikeFlags) string { return string(af.TLSKeyFilePass) },
+		},
+		"cert file": {
+			args: []string{"--tls-cafile", "b64:" + encode(expanded)},
+			got:  func(af *AerospikeFlags) string { return string(af.TLSRootCAFile) },
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			af, sa := parseToolFlags(t, append(tt.args, "--sa-address", unreachableAgent)...)
+			require.NoError(t, af.ResolveSecrets(t.Context(), sa))
+			require.Equal(t, expanded, tt.got(af))
+		})
+	}
+}
+
+func TestResolveSecretsExpandedConfigValueStaysLiteral(t *testing.T) {
+	const expanded = "secrets:" + resolvedPassword
+
+	file := filepath.Join(t.TempDir(), "astools.conf")
+	conf := fmt.Sprintf("[cluster]\nuser = %q\npassword = %q\n\n[secret-agent]\nsa-address = %q\n",
+		"lit", "b64:"+encode(expanded), unreachableAgent)
+	require.NoError(t, os.WriteFile(file, []byte(conf), 0o600))
+
+	config.Reset()
+	t.Cleanup(config.Reset)
+
+	af := NewDefaultAerospikeFlags()
+	sa := NewDefaultSecretAgentFlags()
+
+	fs := af.NewFlagSet(DefaultWrapHelpString)
+	config.BindPFlags(fs, "cluster")
+
+	saFlags := sa.NewFlagSet(DefaultWrapHelpString)
+	config.BindPFlagsWithInstanceFallback(saFlags, "secret-agent")
+	fs.AddFlagSet(saFlags)
+
+	require.NoError(t, fs.Parse(nil))
+
+	_, err := config.InitConfig(file, "", fs)
+	require.NoError(t, err)
+
+	require.NoError(t, af.ResolveSecrets(t.Context(), sa))
+	require.Equal(t, expanded, string(af.Password))
 }
 
 func TestResolveSecretsTLS(t *testing.T) {

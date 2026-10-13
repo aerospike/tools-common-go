@@ -23,6 +23,7 @@ type AerospikeFlags struct {
 	TLSProtocols         TLSProtocolsFlag     `mapstructure:"tls-protocols"`
 	TLSEnable            bool                 `mapstructure:"tls-enable"`
 	UseServicesAlternate bool                 `mapstructure:"use-services-alternate"`
+	secretRefs           secretRefs
 }
 
 func NewDefaultAerospikeFlags() *AerospikeFlags {
@@ -65,6 +66,8 @@ func (af *AerospikeFlags) NewFlagSet(fmtUsage UsageFormatter) *pflag.FlagSet {
 		fmtUsage("Determines if the client should use \"services-alternate\" instead of \"services\""+
 			" in info request during cluster tending."),
 	)
+
+	af.trackSecretRefs(f)
 
 	return f
 }
