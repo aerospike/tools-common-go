@@ -23,6 +23,7 @@ type AerospikeFlags struct {
 	TLSProtocols         TLSProtocolsFlag     `mapstructure:"tls-protocols"`
 	TLSEnable            bool                 `mapstructure:"tls-enable"`
 	UseServicesAlternate bool                 `mapstructure:"use-services-alternate"`
+	secretRefs           secretRefs
 }
 
 func NewDefaultAerospikeFlags() *AerospikeFlags {
@@ -39,7 +40,8 @@ func (af *AerospikeFlags) NewFlagSet(fmtUsage UsageFormatter) *pflag.FlagSet {
 	f := &pflag.FlagSet{}
 	f.VarP(&af.Seeds, "host", "h", fmtUsage("The Aerospike host."))
 	f.IntVarP(&af.DefaultPort, "port", "p", DefaultPort, fmtUsage("The default Aerospike port."))
-	f.StringVarP(&af.User, "user", "U", "", fmtUsage("The Aerospike user for the connection to the Aerospike cluster."))
+	f.StringVarP(&af.User, "user", "U", "", fmtUsage("The Aerospike user for the connection to the Aerospike cluster."+
+		" A secrets:<resource>:<key> value is fetched from the Secret Agent."))
 	f.VarP(&af.Password, "password", "P", fmtUsage("The Aerospike password for the connection to the Aerospike cluster."))
 	f.Var(&af.AuthMode, "auth", fmtUsage("The authentication mode used by the Aerospike server."+
 		" INTERNAL uses standard user/pass. EXTERNAL uses external methods (like LDAP)"+
@@ -64,6 +66,16 @@ func (af *AerospikeFlags) NewFlagSet(fmtUsage UsageFormatter) *pflag.FlagSet {
 		fmtUsage("Determines if the client should use \"services-alternate\" instead of \"services\""+
 			" in info request during cluster tending."),
 	)
+
+	return f
+}
+
+// NewFlagSetWithSecrets is like NewFlagSet, but secrets:[<resource>:]<key>
+// values of --user, --password and the TLS file and password options are kept
+// as references for ResolveSecrets.
+func (af *AerospikeFlags) NewFlagSetWithSecrets(fmtUsage UsageFormatter) *pflag.FlagSet {
+	f := af.NewFlagSet(fmtUsage)
+	af.trackSecretRefs(f)
 
 	return f
 }

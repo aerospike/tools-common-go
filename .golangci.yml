@@ -2,6 +2,8 @@ version: "2"
 run:
   go: "1.24"
   issues-exit-code: 1
+  build-tags:
+    - e2e
 linters:
   default: none
   enable:

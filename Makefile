@@ -2,6 +2,10 @@
 test:
 	go test -v ./...
 
+.PHONY: test-e2e
+test-e2e:
+	go test -tags=e2e -race -count=1 -run '^TestE2E' -v ./secretagent/
+
 .PHONY: coverage
 coverage:
 	go test ./... -coverprofile to_filter.cov -coverpkg ./... || true

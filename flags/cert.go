@@ -34,7 +34,7 @@ func (flag *CertFlag) Set(val string) error {
 }
 
 func (flag *CertFlag) Type() string {
-	return "env-b64:<cert>,b64:<cert>,<cert-file-name>"
+	return "env-b64:<cert>,b64:<cert>,secrets:<resource>:<key>,<cert-file-name>"
 }
 
 func (flag *CertFlag) String() string {
