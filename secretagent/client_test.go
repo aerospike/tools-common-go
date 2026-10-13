@@ -353,35 +353,67 @@ func TestTLS(t *testing.T) {
 	}
 }
 
+// silentAgentTLS lists client TLS settings for an agent that reads and never
+// answers: a plaintext client stalls reading the response, a TLS client in the
+// handshake.
+func silentAgentTLS() map[string]*tls.Config {
+	return map[string]*tls.Config{
+		"plaintext":     nil,
+		"TLS handshake": {MinVersion: tls.VersionTLS12},
+	}
+}
+
+func requireStalledInHandshake(t *testing.T, err error, tlsConfig *tls.Config) {
+	t.Helper()
+
+	if tlsConfig != nil {
+		require.ErrorContains(t, err, "connect to")
+	}
+}
+
 func TestTimeout(t *testing.T) {
 	t.Parallel()
 
-	addr := rawAgent(t, func(conn net.Conn) { _, _ = io.Copy(io.Discard, conn) })
-	client := newClient(t, secretagent.Config{Address: addr, Timeout: 100 * time.Millisecond})
+	for name, tlsConfig := range silentAgentTLS() {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 
-	start := time.Now()
-	_, err := client.GetSecret(t.Context(), testResource, testKey)
+			addr := rawAgent(t, func(conn net.Conn) { _, _ = io.Copy(io.Discard, conn) })
+			client := newClient(t, secretagent.Config{Address: addr, TLS: tlsConfig, Timeout: 100 * time.Millisecond})
 
-	requireClass(t, err, secretagent.ErrRequestFailed)
-	require.ErrorIs(t, err, context.DeadlineExceeded)
-	require.Less(t, time.Since(start), 5*time.Second)
+			start := time.Now()
+			_, err := client.GetSecret(t.Context(), testResource, testKey)
+
+			requireClass(t, err, secretagent.ErrRequestFailed)
+			require.ErrorIs(t, err, context.DeadlineExceeded)
+			requireStalledInHandshake(t, err, tlsConfig)
+			require.Less(t, time.Since(start), 5*time.Second)
+		})
+	}
 }
 
 func TestCancel(t *testing.T) {
 	t.Parallel()
 
-	addr := rawAgent(t, func(conn net.Conn) { _, _ = io.Copy(io.Discard, conn) })
-	client := newClient(t, secretagent.Config{Address: addr, Timeout: time.Minute})
+	for name, tlsConfig := range silentAgentTLS() {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
 
-	ctx, cancel := context.WithCancel(t.Context())
-	time.AfterFunc(100*time.Millisecond, cancel)
+			addr := rawAgent(t, func(conn net.Conn) { _, _ = io.Copy(io.Discard, conn) })
+			client := newClient(t, secretagent.Config{Address: addr, TLS: tlsConfig, Timeout: time.Minute})
 
-	start := time.Now()
-	_, err := client.GetSecret(ctx, testResource, testKey)
+			ctx, cancel := context.WithCancel(t.Context())
+			time.AfterFunc(100*time.Millisecond, cancel)
 
-	requireClass(t, err, secretagent.ErrRequestFailed)
-	require.ErrorIs(t, err, context.Canceled)
-	require.Less(t, time.Since(start), 5*time.Second)
+			start := time.Now()
+			_, err := client.GetSecret(ctx, testResource, testKey)
+
+			requireClass(t, err, secretagent.ErrRequestFailed)
+			require.ErrorIs(t, err, context.Canceled)
+			requireStalledInHandshake(t, err, tlsConfig)
+			require.Less(t, time.Since(start), 5*time.Second)
+		})
+	}
 }
 
 func TestUnreachable(t *testing.T) {
