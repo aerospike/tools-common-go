@@ -366,6 +366,9 @@ func TestResolveSecretsInvalidAgentFlags(t *testing.T) {
 	t.Parallel()
 
 	af, sa := parseToolFlags(t, "-U", "admin", "-P", "admin", "--sa-port", "0")
+	require.NoError(t, af.ResolveSecrets(t.Context(), sa))
+
+	af, sa = parseToolFlags(t, "-U", "admin", "-P", "secrets:aql:password", "--sa-port", "0")
 	require.ErrorContains(t, af.ResolveSecrets(t.Context(), sa), "--sa-port: invalid value 0")
 }
 

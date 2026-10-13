@@ -18,10 +18,6 @@ import (
 // --password is resolved only with a user and --tls-keyfile-password only with
 // a key file, and fetched values are never parsed again.
 func (af *AerospikeFlags) ResolveSecrets(ctx context.Context, sa *SecretAgentFlags) error {
-	if err := sa.Validate(); err != nil {
-		return err
-	}
-
 	var client *secretagent.Client
 
 	for _, target := range af.secretTargets() {

@@ -41,8 +41,9 @@ func (sf *SecretAgentFlags) NewFlagSet(fmtUsage UsageFormatter) *pflag.FlagSet {
 	f.IntVar(&sf.Timeout, "sa-timeout", defaultSecretAgentTimeoutMs, fmtUsage("The Secret Agent timeout in"+
 		" milliseconds, 1 or more. It covers the name lookup, the connection, the TLS handshake and the request."))
 	f.StringVar(&sf.CAFile, "sa-ca-file", "", fmtUsage("A CA certificate file. Enables TLS to the Secret Agent"+
-		" and verifies its certificate against this CA."))
-	f.StringVar(&sf.legacyCAFile, "sa-cafile", "", fmtUsage("Same as --sa-ca-file, as spelled by the asbackup/asrestore tools."))
+		" and verifies its certificate against this CA. The certificate must match the --sa-address host."))
+	f.StringVar(&sf.legacyCAFile, "sa-cafile", "", fmtUsage("Same as --sa-ca-file,"+
+		" as spelled by the asbackup/asrestore tools."))
 	_ = f.MarkDeprecated("sa-cafile", "use --sa-ca-file instead")
 
 	sf.flagSet = f
@@ -89,7 +90,7 @@ func (sf *SecretAgentFlags) config() (secretagent.Config, error) {
 		return secretagent.Config{}, err
 	}
 
-	if sf.Timeout < 1 {
+	if sf.Timeout < 1 || sf.Timeout > math.MaxInt32 {
 		return secretagent.Config{}, fmt.Errorf("--sa-timeout: invalid value %d, expected an integer from 1 to %d",
 			sf.Timeout, math.MaxInt32)
 	}
@@ -110,13 +111,14 @@ func (sf *SecretAgentFlags) address() (string, error) {
 	if sf.Address != "" {
 		var ok bool
 		if host, port, ok = parseSecretAgentAddress(sf.Address); !ok {
-			return "", fmt.Errorf("--sa-address: invalid value %s", sf.Address)
+			return "", fmt.Errorf("--sa-address: invalid value %s, expected <host>[:<port>] or [<ipv6>][:<port>]",
+				sf.Address)
 		}
 	}
 
 	if sf.Port != "" {
 		if !validPort(sf.Port) {
-			return "", fmt.Errorf("--sa-port: invalid value %s", sf.Port)
+			return "", fmt.Errorf("--sa-port: invalid value %s, expected an integer from 1 to %d", sf.Port, math.MaxUint16)
 		}
 
 		addressWins := port != "" && sf.changed("sa-address") && !sf.changed("sa-port")

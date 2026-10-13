@@ -188,11 +188,21 @@ func TestSecretAgentFlagsValidate(t *testing.T) {
 		want string
 		args []string
 	}{
-		"address":      {args: []string{"--sa-address", "host:3005:x"}, want: "--sa-address: invalid value host:3005:x"},
-		"port":         {args: []string{"--sa-port", "0"}, want: "--sa-port: invalid value 0"},
+		"address": {
+			args: []string{"--sa-address", "host:3005:x"},
+			want: "--sa-address: invalid value host:3005:x, expected <host>[:<port>] or [<ipv6>][:<port>]",
+		},
+		"port": {
+			args: []string{"--sa-port", "0"},
+			want: "--sa-port: invalid value 0, expected an integer from 1 to 65535",
+		},
 		"port range":   {args: []string{"--sa-port", "70000"}, want: "--sa-port: invalid value 70000"},
 		"zero timeout": {args: []string{"--sa-timeout", "0"}, want: "--sa-timeout: invalid value 0"},
 		"neg timeout":  {args: []string{"--sa-timeout", "-5"}, want: "--sa-timeout: invalid value -5"},
+		"huge timeout": {
+			args: []string{"--sa-timeout", "9223372036854775807"},
+			want: "--sa-timeout: invalid value 9223372036854775807, expected an integer from 1 to 2147483647",
+		},
 	}
 
 	for name, tt := range tests {
