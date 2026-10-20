@@ -12,6 +12,9 @@ import (
 // This is only needed because if "instance". Otherwise we would just run
 // RegisterAlias inside the BindPFlags function.
 var configToFlagMap = map[string]string{}
+
+// Sections whose <section>_<instance> falls back to <section> when absent.
+var fallbackSections = map[string]bool{}
 var confDirs = []string{".", DefaultConfDir}
 var confName = DefaultConfName
 
@@ -118,12 +121,22 @@ func BindPFlags(flags *pflag.FlagSet, section string) {
 	})
 }
 
+// BindPFlagsWithInstanceFallback is like BindPFlags, except that with an
+// instance it reads <section>_<instance> when that section exists and <section>
+// otherwise. This matches how the Aerospike C tools read [secret-agent].
+func BindPFlagsWithInstanceFallback(flags *pflag.FlagSet, section string) {
+	BindPFlags(flags, section)
+
+	fallbackSections[section] = true
+}
+
 // Reset resets the global configToFlagMap and viper instance.
 // Should be called before or after tests that use InitConfig or BindPFlags.
 // If using testify suites call it in the SetupTest function and or
 // SetupSubTests if using suite.T().Run(...).
 func Reset() {
 	configToFlagMap = map[string]string{}
+	fallbackSections = map[string]bool{}
 
 	viper.Reset()
 }
@@ -144,7 +157,10 @@ func getAlias(key, instance string) string {
 	}
 
 	if instance != "" {
-		keySplit[0] += "_" + instance
+		instanceSection := keySplit[0] + "_" + instance
+		if !fallbackSections[keySplit[0]] || viper.IsSet(instanceSection) {
+			keySplit[0] = instanceSection
+		}
 	}
 
 	return strings.Join(keySplit, ".")
