@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"os"
+	"strings"
 
 	as "github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/tools-common-go/secretagent"
@@ -23,6 +24,9 @@ var errSecretsNotTracked = errors.New("secret references are not tracked, use Ne
 // stays literal, and fetched values are never parsed again. Call it after the
 // flags and the config file are parsed, so option order does not matter, and
 // before NewAerospikeConfig.
+//
+// The --tls-keyfile-password text has surrounding whitespace trimmed before
+// its form, secrets: included, is read. --password is used as given.
 //
 // --password is read only with a user and an auth mode other than PKI, and
 // --tls-keyfile-password only with a key file. Otherwise the value is dropped,
@@ -188,27 +192,31 @@ func (p passwordOption) read() error {
 }
 
 func (af *AerospikeFlags) secretTargets() []secretTarget {
+	keyFilePass := newSecretTarget("tls-keyfile-password", &af.TLSKeyFilePass, &af.secretRefs.tlsKeyFilePass,
+		&af.secretRefs.unreadTLSKeyFilePass)
+	keyFilePass.trim = true
+
 	return []secretTarget{
 		newSecretTarget("user", &af.User, &af.secretRefs.user, nil),
 		newSecretTarget("password", &af.Password, &af.secretRefs.password, &af.secretRefs.unreadPassword),
 		newSecretTarget("tls-cafile", &af.TLSRootCAFile, &af.secretRefs.tlsCAFile, nil),
 		newSecretTarget("tls-certfile", &af.TLSCertFile, &af.secretRefs.tlsCertFile, nil),
 		newSecretTarget("tls-keyfile", &af.TLSKeyFile, &af.secretRefs.tlsKeyFile, nil),
-		newSecretTarget("tls-keyfile-password", &af.TLSKeyFilePass, &af.secretRefs.tlsKeyFilePass,
-			&af.secretRefs.unreadTLSKeyFilePass),
+		keyFilePass,
 	}
 }
 
 // trackSecretRefs wraps the flags ResolveSecrets reads. A secrets: value is
 // stored as is, and the wrapper records whether the raw text was a reference,
 // because b64:, env: and file: values of the other flags are stored after
-// expansion. --password and --tls-keyfile-password store every value as is,
-// for ResolveSecrets to read once the user, auth mode and key file are known.
+// expansion. --password stores every value as is and --tls-keyfile-password
+// with surrounding whitespace trimmed, for ResolveSecrets to read once the
+// user, auth mode and key file are known.
 func (af *AerospikeFlags) trackSecretRefs(f *pflag.FlagSet) {
 	for _, target := range af.secretTargets() {
 		flag := f.Lookup(target.name)
 		flag.Value = &secretRefValue{
-			Value: flag.Value, isRef: target.isRef, unread: target.unread, setRaw: target.set,
+			Value: flag.Value, isRef: target.isRef, unread: target.unread, setRaw: target.set, trim: target.trim,
 		}
 	}
 
@@ -221,9 +229,14 @@ type secretRefValue struct {
 	isRef  *bool
 	unread *bool
 	setRaw func(string)
+	trim   bool
 }
 
 func (v *secretRefValue) Set(val string) error {
+	if v.trim {
+		val = strings.Trim(val, asciiSpace)
+	}
+
 	isRef := secretagent.IsSecret(val)
 
 	switch {
@@ -249,6 +262,7 @@ type secretTarget struct {
 	unread *bool
 	name   string
 	ref    string
+	trim   bool
 }
 
 func newSecretTarget[T ~string | ~[]byte](name string, value *T, isRef, unread *bool) secretTarget {

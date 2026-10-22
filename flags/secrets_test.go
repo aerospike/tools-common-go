@@ -22,6 +22,8 @@ const (
 	resolvedKeyPass  = "key-pass"
 	resolvedCA       = "ca-pem"
 	unreachableAgent = "127.0.0.1:1"
+	literalKeyPass   = "kp-s3cr3t"
+	nbsp             = "\u00a0"
 )
 
 func encode(value string) string {
@@ -469,6 +471,84 @@ func TestResolveSecretsReadsSourcesOnce(t *testing.T) {
 	require.Equal(t, "env:TCG_TEST_UNSET", string(af.Password))
 }
 
+func TestResolveSecretsTrimsKeyFilePassword(t *testing.T) {
+	const space = " \t\n\v\f\r"
+
+	t.Setenv("TCG_TEST_KP", "env-kp")
+	t.Setenv("TCG_TEST_KP_B64", encode("env-b64-kp"))
+
+	agent := newTestAgent(t)
+	keyPassFile := writePasswordFile(t, " file kp \t\nsecond line\n")
+
+	tests := map[string]struct {
+		value string
+		want  string
+	}{
+		"env":                   {value: " env:TCG_TEST_KP ", want: "env-kp"},
+		"env-b64":               {value: "\tenv-b64:TCG_TEST_KP_B64\n", want: "env-b64-kp"},
+		"b64":                   {value: "  b64:" + encode("b64-kp") + "\r\n", want: "b64-kp"},
+		"file keeps first line": {value: " file:" + keyPassFile + " ", want: " file kp \t"},
+		"secrets":               {value: " secrets:aql:keypass\t", want: resolvedKeyPass},
+		"padded literal":        {value: "  " + literalKeyPass + " \t", want: literalKeyPass},
+		"every ASCII space":     {value: space + literalKeyPass + space, want: literalKeyPass},
+		"leading NBSP":          {value: nbsp + literalKeyPass, want: nbsp + literalKeyPass},
+		"Unicode spaces kept":   {value: " " + nbsp + literalKeyPass + "\u0085 ", want: nbsp + literalKeyPass + "\u0085"},
+		"NBSP before a source":  {value: nbsp + "env:TCG_TEST_KP", want: nbsp + "env:TCG_TEST_KP"},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			af, sa := parseToolFlags(t,
+				"--tls-keyfile", "file:"+testFileDataPath, "--tls-keyfile-password", tt.value, "--sa-address", agent.Addr())
+
+			require.NoError(t, af.ResolveSecrets(t.Context(), sa))
+			require.Equal(t, tt.want, string(af.TLSKeyFilePass))
+		})
+	}
+}
+
+func TestResolveSecretsKeepsPasswordWhitespace(t *testing.T) {
+	t.Setenv("TCG_TEST_PASSWORD", "env-pass")
+
+	for _, value := range []string{" env:TCG_TEST_PASSWORD ", " secrets:aql:password ", "  pass \t"} {
+		t.Run(value, func(t *testing.T) {
+			af, sa := parseToolFlags(t, "-U", "admin", "-P", value, "--sa-address", unreachableAgent)
+
+			require.NoError(t, af.ResolveSecrets(t.Context(), sa))
+			require.Equal(t, value, string(af.Password))
+		})
+	}
+}
+
+func TestResolveSecretsTrimsKeyFilePasswordFromConfigFile(t *testing.T) {
+	t.Setenv("TCG_TEST_KP", "env-kp")
+
+	agent := newTestAgent(t)
+
+	tests := map[string]struct {
+		value string
+		want  string
+	}{
+		"env":            {value: " env:TCG_TEST_KP ", want: "env-kp"},
+		"b64":            {value: "\tb64:" + encode("b64-kp") + " ", want: "b64-kp"},
+		"secrets":        {value: "\tsecrets:aql:keypass ", want: resolvedKeyPass},
+		"padded literal": {value: "  " + literalKeyPass + " \t", want: literalKeyPass},
+		"leading NBSP":   {value: nbsp + literalKeyPass, want: nbsp + literalKeyPass},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			af, sa := parseToolConfig(t, fmt.Sprintf(
+				"[cluster]\nuser = \"admin\"\npassword = %q\ntls-keyfile = %q\ntls-keyfile-password = %q\n\n"+
+					"[secret-agent]\nsa-address = %q\n", tt.value, testFileDataPath, tt.value, agent.Addr()))
+
+			require.NoError(t, af.ResolveSecrets(t.Context(), sa))
+			require.Equal(t, tt.want, string(af.TLSKeyFilePass))
+			require.Equal(t, tt.value, string(af.Password))
+		})
+	}
+}
+
 func TestResolveSecretsCommandLineLabels(t *testing.T) {
 	t.Parallel()
 
@@ -754,6 +834,7 @@ func TestNewFlagSetWithSecretsPasswordUsage(t *testing.T) {
 		"and one trailing newline is dropped after decoding.",
 		"A password that itself begins with 'env:', 'env-b64:', 'b64:' or",
 		"'file:' must be given as 'b64:'.",
+		"Surrounding whitespace is trimmed before the form is read.",
 		"The password is read only when a key file is set. It must be at",
 		"most 1024 bytes.",
 		"Default: none",

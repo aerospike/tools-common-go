@@ -24,6 +24,8 @@ const (
 	filePrefix   = "file:"
 )
 
+const asciiSpace = " \t\n\v\f\r"
+
 // PasswordFlag defines a Cobra compatible
 // flag for password related options.
 // examples include
