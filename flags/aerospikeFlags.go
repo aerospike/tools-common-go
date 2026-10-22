@@ -112,6 +112,7 @@ Prefixes are case-sensitive. A base64 value may be line wrapped,
 and one trailing newline is dropped after decoding.
 A password that itself begins with 'env:', 'env-b64:', 'b64:' or
 'file:' must be given as 'b64:'.
+Surrounding whitespace is trimmed before the form is read.
 The password is read only when a key file is set. It must be at
 most 1024 bytes.
 Default: none
