@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"os"
 	"reflect"
+	"strings"
 	"testing"
 )
 
@@ -117,6 +118,15 @@ func TestCert(t *testing.T) {
 				t.Errorf("flagFormatParser() = %v, want %v", actual, tc.output)
 			}
 		})
+	}
+}
+
+func TestCertSetEmptyB64(t *testing.T) {
+	var flag CertFlag
+
+	err := flag.Set("b64:")
+	if err == nil || !strings.Contains(err.Error(), "b64: value is empty") {
+		t.Fatalf("got %v, want an error saying the b64: value is empty", err)
 	}
 }
 

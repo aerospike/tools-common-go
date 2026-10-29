@@ -50,7 +50,7 @@ func decode64(b64Val string) (string, error) {
 	}
 
 	// Not sure why but b64Val can have \n.  Maybe because of env var?
-	if byteVal[len(byteVal)-1] == '\n' {
+	if len(byteVal) > 0 && byteVal[len(byteVal)-1] == '\n' {
 		return string(byteVal[0 : len(byteVal)-1]), nil
 	}
 
