@@ -138,6 +138,17 @@ func parseToolConfig(t *testing.T, conf string) (*AerospikeFlags, *SecretAgentFl
 func parseToolConfigArgs(t *testing.T, conf, instance string, args ...string) (*AerospikeFlags, *SecretAgentFlags) {
 	t.Helper()
 
+	af, sa, err := loadToolConfig(t, conf, instance, args...)
+	require.NoError(t, err)
+
+	return af, sa
+}
+
+// loadToolConfig is parseToolConfigArgs returning the command line or config
+// file error.
+func loadToolConfig(t *testing.T, conf, instance string, args ...string) (*AerospikeFlags, *SecretAgentFlags, error) {
+	t.Helper()
+
 	file := filepath.Join(t.TempDir(), "astools.conf")
 	require.NoError(t, os.WriteFile(file, []byte(conf), 0o600))
 
@@ -154,12 +165,26 @@ func parseToolConfigArgs(t *testing.T, conf, instance string, args ...string) (*
 	config.BindPFlagsWithInstanceFallback(saFlags, "secret-agent")
 	fs.AddFlagSet(saFlags)
 
-	require.NoError(t, fs.Parse(args))
+	if err := fs.Parse(args); err != nil {
+		return af, sa, err
+	}
 
 	_, err := config.InitConfig(file, instance, fs)
-	require.NoError(t, err)
 
-	return af, sa
+	return af, sa, err
+}
+
+// resolveToolConfig loads conf and args as a tool does and resolves the
+// secrets, returning the first error.
+func resolveToolConfig(t *testing.T, conf, instance string, args ...string) error {
+	t.Helper()
+
+	af, sa, err := loadToolConfig(t, conf, instance, args...)
+	if err != nil {
+		return err
+	}
+
+	return af.ResolveSecrets(t.Context(), sa)
 }
 
 // newProxy forwards connections accepted on listenAddr to backend and counts
@@ -1038,4 +1063,22 @@ func TestResolveSecretsSkipsTLSSecretsWithoutTLS(t *testing.T) {
 
 	require.NoError(t, af.ResolveSecrets(t.Context(), sa))
 	require.Zero(t, conns.Load())
+}
+
+func TestResolveSecretsConfigMergedWithCommandLine(t *testing.T) {
+	agent := newTestAgent(t)
+	addr, conns := newProxy(t, "127.0.0.1:0", agent.Addr())
+
+	host, port, err := net.SplitHostPort(addr)
+	require.NoError(t, err)
+
+	conf := fmt.Sprintf("[cluster]\nuser = \"secrets:aql:user\"\npassword = \"secrets:aql:missing\"\n\n"+
+		"[secret-agent]\nsa-address = %q\n", host)
+
+	af, sa := parseToolConfigArgs(t, conf, "", "--sa-port", port, "-P", "cli-pass")
+
+	require.NoError(t, af.ResolveSecrets(t.Context(), sa))
+	require.Equal(t, resolvedUser, af.User)
+	require.Equal(t, "cli-pass", string(af.Password))
+	require.EqualValues(t, 1, conns.Load())
 }
