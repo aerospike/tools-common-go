@@ -567,3 +567,22 @@ func TestAgentErrorField(t *testing.T) {
 		})
 	}
 }
+
+func TestRequestEscaping(t *testing.T) {
+	t.Parallel()
+
+	agent := secretagenttest.NewServer(t, secretagenttest.Secrets{
+		testResource: {passwordKey: testSecret},
+		"other":      {passwordKey: "other-secret"},
+	})
+	client := newClient(t, agentConfig(agent))
+
+	for _, ref := range []string{
+		`secrets:res","Resource":"other:password`,
+		"secrets:res:p\\" + "u0061ssword",
+	} {
+		got, err := client.Resolve(t.Context(), ref)
+		requireClass(t, err, secretagent.ErrRequestFailed)
+		require.Empty(t, got, ref)
+	}
+}
