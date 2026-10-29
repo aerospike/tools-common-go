@@ -27,9 +27,11 @@ type Request struct {
 	SecretKey string `json:"SecretKey"`
 }
 
+// Response is an agent reply. Error is set when the reply has an Error field,
+// even an empty one.
 type Response struct {
-	SecretValue string `json:"SecretValue,omitempty"`
-	Error       string `json:"Error,omitempty"`
+	Error       *string `json:"Error,omitempty"`
+	SecretValue string  `json:"SecretValue,omitempty"`
 }
 
 // encode returns v as one framed message.
