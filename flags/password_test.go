@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"reflect"
 	"strings"
-	"syscall"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -117,13 +116,8 @@ func TestPasswordSetEmptyB64(t *testing.T) {
 
 	var flag PasswordFlag
 
-	if err := flag.Set("b64:"); err != nil {
-		t.Fatal(err)
-	}
-
-	if string(flag) != "b64:" {
-		t.Fatalf("got %q, want the literal b64:", string(flag))
-	}
+	require.ErrorContains(t, flag.Set("b64:"), "b64: value is empty")
+	require.Empty(t, string(flag))
 }
 
 func writePasswordFile(t *testing.T, content string) string {
@@ -218,11 +212,12 @@ func TestReadPasswordErrors(t *testing.T) {
 		"file CRLF only":    {value: "file:" + crlfFile, want: "password from file " + crlfFile + " is empty"},
 		"file NUL":          {value: "file:" + nulFile, want: "file " + nulFile + " contains a NUL byte"},
 		"file missing": {
-			value: "file:" + missingFile, want: "cannot read file " + missingFile + ": " + syscall.ENOENT.Error(),
+			value: "file:" + missingFile, want: "cannot read file " + missingFile + ": No such file or directory",
 		},
 		"file is a directory": {
-			value: "file:" + dir, want: "cannot read file " + dir + ": " + syscall.EISDIR.Error(),
+			value: "file:" + dir, want: "cannot read file " + dir + ": Is a directory",
 		},
+		"literal NUL": {value: "a\x00b", want: "password contains a NUL byte"},
 		"first line empty": {
 			value: "file:" + emptyFirstLine, firstLine: true,
 			want: "password from first line of file " + emptyFirstLine + " is empty",
@@ -258,6 +253,7 @@ func TestReadPasswordLimits(t *testing.T) {
 	capped63File := writePasswordFile(t, over63+"pp\x00")
 	over1024File := writePasswordFile(t, over1024+"\nsecond\n")
 	capped1024File := writePasswordFile(t, over1024+"kk\x00")
+	cappedAfterCRLFFile := writePasswordFile(t, at63+"\r\nX")
 
 	keyMax := tlsKeyFilePasswordMaxLen
 
@@ -314,6 +310,18 @@ func TestReadPasswordLimits(t *testing.T) {
 		"file read stops at 66 bytes": {
 			value: "file:" + capped63File, maxLen: passwordMaxLen,
 			want: "--password: value from file " + capped63File + " is longer than 63 bytes",
+		},
+		"file read reaches past CRLF": {
+			value: "file:" + cappedAfterCRLFFile, maxLen: passwordMaxLen,
+			want: "--password: value from file " + cappedAfterCRLFFile + " is longer than 63 bytes",
+		},
+		"literal 64 bytes in 32 runes": {
+			value: strings.Repeat("é", 32), maxLen: passwordMaxLen,
+			want: "--password: password is longer than 63 bytes",
+		},
+		"literal 1026 bytes in 513 runes": {
+			value: strings.Repeat("é", 513), maxLen: tlsKeyFilePasswordMaxLen, firstLine: true,
+			want: "--password: password is longer than 1024 bytes",
 		},
 		"literal 1025": {
 			value: over1024, maxLen: tlsKeyFilePasswordMaxLen, firstLine: true,

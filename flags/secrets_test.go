@@ -4,6 +4,7 @@ import (
 	"crypto/x509"
 	"encoding/base64"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"strings"
@@ -796,6 +797,49 @@ func TestResolveSecretsPasswordLimitsFromConfigFile(t *testing.T) {
 	af, sa = parseToolConfig(t, fmt.Sprintf("[cluster]\nuser = \"admin\"\npassword = %q\n",
 		strings.Repeat("p", passwordMaxLen+1)))
 	require.EqualError(t, af.ResolveSecrets(t.Context(), sa), "password in config file: password is longer than 63 bytes")
+}
+
+func TestResolveSecretsFetchErrorFromConfigFile(t *testing.T) {
+	agent := newTestAgent(t)
+
+	af, sa := parseToolConfig(t, fmt.Sprintf(
+		"[cluster]\nuser = \"admin\"\npassword = \"secrets:aql:missing\"\n\n[secret-agent]\nsa-address = %q\n", agent.Addr()))
+
+	err := af.ResolveSecrets(t.Context(), sa)
+	require.ErrorIs(t, err, secretagent.ErrRequestFailed)
+	require.True(t, strings.HasPrefix(err.Error(), "password in config file: "), err.Error())
+}
+
+func TestResolveSecretsRejectsNUL(t *testing.T) {
+	agent := secretagenttest.NewServer(t, secretagenttest.Secrets{"aql": {"nul": encode("a\x00b")}})
+
+	af, sa := parseToolFlags(t, "-U", "admin", "-P", "secrets:aql:nul", "--sa-address", agent.Addr())
+	require.EqualError(t, af.ResolveSecrets(t.Context(), sa), "--password: password contains a NUL byte")
+
+	af, sa = parseToolFlags(t, "--tls-keyfile", "file:"+testFileDataPath,
+		"--tls-keyfile-password", "secrets:aql:nul", "--sa-address", agent.Addr())
+	require.EqualError(t, af.ResolveSecrets(t.Context(), sa), "--tls-keyfile-password: password contains a NUL byte")
+
+	af, sa = parseToolConfig(t, "[cluster]\nuser = \"admin\"\npassword = \"a\\u0000b\"\n")
+	require.EqualError(t, af.ResolveSecrets(t.Context(), sa), "password in config file: password contains a NUL byte")
+}
+
+func TestResolveSecretsWarnsOnStderrByDefault(t *testing.T) {
+	r, w, err := os.Pipe()
+	require.NoError(t, err)
+
+	stderr := os.Stderr
+	os.Stderr = w
+
+	t.Cleanup(func() { os.Stderr = stderr })
+
+	af, sa := parseToolFlags(t, "-P", "env:TCG_TEST_UNSET", "--sa-address", unreachableAgent)
+	require.NoError(t, af.ResolveSecrets(t.Context(), sa))
+	require.NoError(t, w.Close())
+
+	out, err := io.ReadAll(r)
+	require.NoError(t, err)
+	require.Equal(t, "Warning: --password: ignored because no user is set\n", string(out))
 }
 
 func TestNewFlagSetWithSecretsPasswordUsage(t *testing.T) {
