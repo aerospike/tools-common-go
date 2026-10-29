@@ -13,6 +13,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"path/filepath"
 	"strings"
@@ -28,6 +29,8 @@ import (
 	"github.com/docker/go-connections/nat"
 	"github.com/stretchr/testify/require"
 
+	"github.com/aerospike/tools-common-go/config"
+	"github.com/aerospike/tools-common-go/flags"
 	"github.com/aerospike/tools-common-go/secretagent"
 	"github.com/aerospike/tools-common-go/secretagent/secretagenttest"
 )
@@ -251,12 +254,12 @@ func writeSecrets(dir string) error {
 }
 
 func writeAgentConfig(dir string, spec *agentSpec) error {
-	config := "service:\n  tcp:\n    endpoint: 0.0.0.0:3005\n" + spec.tls +
+	conf := "service:\n  tcp:\n    endpoint: 0.0.0.0:3005\n" + spec.tls +
 		"secret-manager:\n  file:\n    convert-to-base64: true\n    resources:\n" +
 		"      aql: \"/agent/aql.json\"\n      other: \"/agent/other.json\"\n" +
 		"log:\n  level: debug\n"
 
-	return os.WriteFile(filepath.Join(dir, spec.name+".yaml"), []byte(config), 0o600)
+	return os.WriteFile(filepath.Join(dir, spec.name+".yaml"), []byte(conf), 0o600)
 }
 
 // shareWithAgent makes the flat dir readable by the container user, whatever
@@ -603,4 +606,106 @@ func TestE2EConcurrent(t *testing.T) {
 	for err := range errs {
 		require.NoError(t, err)
 	}
+}
+
+func e2eToolConfig(
+	t *testing.T, conf, instance string, args ...string,
+) (*flags.AerospikeFlags, *flags.SecretAgentFlags) {
+	t.Helper()
+
+	file := filepath.Join(t.TempDir(), "astools.conf")
+	require.NoError(t, os.WriteFile(file, []byte(conf), 0o600))
+
+	config.Reset()
+	t.Cleanup(config.Reset)
+
+	af := flags.NewDefaultAerospikeFlags()
+	sa := flags.NewDefaultSecretAgentFlags()
+
+	fs := af.NewFlagSetWithSecrets(flags.DefaultWrapHelpString)
+	config.BindPFlags(fs, "cluster")
+
+	saFlags := sa.NewFlagSet(flags.DefaultWrapHelpString)
+	config.BindPFlagsWithInstanceFallback(saFlags, "secret-agent")
+	fs.AddFlagSet(saFlags)
+
+	require.NoError(t, fs.Parse(args))
+
+	_, err := config.InitConfig(file, instance, fs)
+	require.NoError(t, err)
+
+	return af, sa
+}
+
+func TestE2EFlagsAndConfigFile(t *testing.T) {
+	untrusted, err := secretagenttest.GeneratePKI(t.TempDir())
+	require.NoError(t, err)
+
+	host, port, err := net.SplitHostPort(e2e.tlsAddr)
+	require.NoError(t, err)
+
+	ca := e2e.pki.CAFile
+	cluster := "user = \"secrets:other:password\"\npassword = \"secrets:aql:password\"\n\n"
+
+	tests := map[string]struct {
+		want     error
+		conf     string
+		instance string
+		args     []string
+	}{
+		"config file":        {conf: fmt.Sprintf("[secret-agent]\nsa-address = %q\nsa-ca-file = %q\n", e2e.tlsAddr, ca)},
+		"C spelling CA file": {conf: fmt.Sprintf("[secret-agent]\nsa-address = %q\nsa-cafile = %q\n", e2e.tlsAddr, ca)},
+		"host name, port on the command line": {
+			conf: fmt.Sprintf("[secret-agent]\nsa-address = \"localhost\"\nsa-ca-file = %q\n", ca),
+			args: []string{"--sa-port", port},
+		},
+		"CA file on the command line": {
+			conf: fmt.Sprintf("[secret-agent]\nsa-address = %q\nsa-port = %q\n", host, port),
+			args: []string{"--sa-ca-file", ca},
+		},
+		"instance section": {
+			conf: fmt.Sprintf("[secret-agent]\nsa-address = %q\n\n[secret-agent_e2e]\nsa-address = %q\nsa-ca-file = %q\n",
+				unreachableAddr, e2e.tlsAddr, ca),
+			instance: "e2e",
+		},
+		"untrusted CA": {
+			conf: fmt.Sprintf("[secret-agent]\nsa-address = %q\nsa-ca-file = %q\n", e2e.tlsAddr, untrusted.CAFile),
+			want: secretagent.ErrRequestFailed,
+		},
+		"plaintext to TLS agent": {
+			conf: fmt.Sprintf("[secret-agent]\nsa-address = %q\n", e2e.tlsAddr),
+			want: secretagent.ErrRequestFailed,
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			section := "[cluster]\n"
+			if tt.instance != "" {
+				section = "[cluster_" + tt.instance + "]\n"
+			}
+
+			af, sa := e2eToolConfig(t, section+cluster+tt.conf, tt.instance, tt.args...)
+
+			err := af.ResolveSecrets(t.Context(), sa)
+			if tt.want != nil {
+				require.ErrorIs(t, err, tt.want)
+				require.NotContains(t, err.Error(), testSecret)
+
+				return
+			}
+
+			require.NoError(t, err)
+			require.Equal(t, otherValue, af.User)
+			require.Equal(t, testSecret, string(af.Password))
+		})
+	}
+
+	t.Run("crafted reference", func(t *testing.T) {
+		af, sa := e2eToolConfig(t, fmt.Sprintf("[cluster]\nuser = %q\n\n[secret-agent]\nsa-address = %q\nsa-ca-file = %q\n",
+			`secrets:aql","Resource":"other:password`, e2e.tlsAddr, ca), "")
+
+		require.ErrorIs(t, af.ResolveSecrets(t.Context(), sa), secretagent.ErrRequestFailed)
+		require.NotEqual(t, otherValue, af.User)
+	})
 }
