@@ -1082,3 +1082,32 @@ func TestResolveSecretsConfigMergedWithCommandLine(t *testing.T) {
 	require.Equal(t, "cli-pass", string(af.Password))
 	require.EqualValues(t, 1, conns.Load())
 }
+
+func TestResolveSecretsFetchedValuesUsedAsIs(t *testing.T) {
+	t.Parallel()
+
+	values := []string{" env:HOME ", "b64:" + encode("x"), "file:" + testFileDataPath, "secrets:aql:password"}
+
+	secrets := map[string]string{}
+	for i, value := range values {
+		secrets[fmt.Sprint(i)] = encode(value)
+	}
+
+	agent := secretagenttest.NewServer(t, secretagenttest.Secrets{"aql": secrets})
+
+	for i, value := range values {
+		ref := fmt.Sprintf("secrets:aql:%d", i)
+
+		t.Run(value, func(t *testing.T) {
+			t.Parallel()
+
+			af, sa := parseToolFlags(t, "-U", ref, "-P", ref, "--tls-enable", "--tls-keyfile", "file:"+testFileDataPath,
+				"--tls-keyfile-password", ref, "--sa-address", agent.Addr())
+
+			require.NoError(t, af.ResolveSecrets(t.Context(), sa))
+			require.Equal(t, value, af.User)
+			require.Equal(t, value, string(af.Password))
+			require.Equal(t, value, string(af.TLSKeyFilePass))
+		})
+	}
+}
