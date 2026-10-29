@@ -31,7 +31,8 @@ var errSecretsNotTracked = errors.New("secret references are not tracked, use Ne
 // --password is read only with a user and an auth mode other than PKI, and
 // --tls-keyfile-password only with a key file. Otherwise the value is dropped,
 // and a --password source or secrets: value without a user is reported to the
-// warning handler.
+// warning handler. secrets: values of the TLS options are fetched only with
+// --tls-enable.
 // --password must be at most 63 bytes and --tls-keyfile-password at most 1024
 // bytes, whatever their source. Errors name the option, or the config file key
 // when the value came from the config file.
@@ -74,7 +75,7 @@ func (af *AerospikeFlags) fetchSecrets(ctx context.Context, sa *SecretAgentFlags
 	var client *secretagent.Client
 
 	for _, target := range af.secretTargets() {
-		if !*target.isRef {
+		if !*target.isRef || (strings.HasPrefix(target.name, "tls-") && !af.TLSEnable) {
 			continue
 		}
 

@@ -5,9 +5,12 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
+	"sync/atomic"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -76,7 +79,7 @@ func TestResolveSecrets(t *testing.T) {
 	agent := newTestAgent(t)
 
 	af, sa := parseToolFlags(t,
-		"-U", "secrets:aql:user", "-P", "secrets:aql:password",
+		"-U", "secrets:aql:user", "-P", "secrets:aql:password", "--tls-enable",
 		"--tls-keyfile", "file:"+testFileDataPath, "--tls-keyfile-password", "secrets:aql:keypass",
 		"--sa-address", agent.Addr(),
 	)
@@ -159,11 +162,72 @@ func parseToolConfigArgs(t *testing.T, conf, instance string, args ...string) (*
 	return af, sa
 }
 
+// newProxy forwards connections accepted on listenAddr to backend and counts
+// them. It skips the test when listenAddr is IPv6 and the host has no IPv6
+// loopback.
+func newProxy(t *testing.T, listenAddr, backend string) (string, *atomic.Int32) {
+	t.Helper()
+
+	ln, err := net.Listen("tcp", listenAddr)
+	if err != nil && strings.HasPrefix(listenAddr, "[") {
+		t.Skipf("no IPv6 loopback: %v", err)
+	}
+
+	require.NoError(t, err)
+
+	var (
+		conns atomic.Int32
+		wg    sync.WaitGroup
+	)
+
+	wg.Add(1)
+
+	go func() {
+		defer wg.Done()
+
+		for {
+			conn, acceptErr := ln.Accept()
+			if acceptErr != nil {
+				return
+			}
+
+			conns.Add(1)
+			wg.Add(1)
+
+			go func() {
+				defer wg.Done()
+				defer func() { _ = conn.Close() }()
+
+				upstream, dialErr := net.Dial("tcp", backend)
+				if dialErr != nil {
+					return
+				}
+
+				go func() {
+					_, _ = io.Copy(upstream, conn)
+					_ = upstream.Close()
+				}()
+
+				_, _ = io.Copy(conn, upstream)
+				_ = upstream.Close()
+			}()
+		}
+	}()
+
+	t.Cleanup(func() {
+		_ = ln.Close()
+
+		wg.Wait()
+	})
+
+	return ln.Addr().String(), &conns
+}
+
 func TestResolveSecretsFromConfigFile(t *testing.T) {
 	agent := newTestAgent(t)
 
 	af, sa := parseToolConfig(t, fmt.Sprintf(
-		"[cluster]\nuser = %q\npassword = %q\ntls-cafile = %q\n\n[secret-agent]\nsa-address = %q\n",
+		"[cluster]\nuser = %q\npassword = %q\ntls-enable = true\ntls-cafile = %q\n\n[secret-agent]\nsa-address = %q\n",
 		"secrets:aql:user", "secrets:aql:password", "secrets:aql:ca", agent.Addr()))
 
 	require.NoError(t, af.ResolveSecrets(t.Context(), sa))
@@ -357,14 +421,14 @@ func TestResolveSecretsErrors(t *testing.T) {
 			class: secretagent.ErrRequestFailed,
 		},
 		"cert file": {
-			args:  []string{"--tls-cafile", "secrets:aql:missing", "--sa-address", agent.Addr()},
+			args:  []string{"--tls-enable", "--tls-cafile", "secrets:aql:missing", "--sa-address", agent.Addr()},
 			want:  []string{"--tls-cafile: ", "secrets:aql:missing"},
 			class: secretagent.ErrRequestFailed,
 		},
 		"key file password": {
 			args: []string{
-				"--tls-keyfile", "file:" + testFileDataPath, "--tls-keyfile-password", "secrets:aql:missing",
-				"--sa-address", agent.Addr(),
+				"--tls-enable", "--tls-keyfile", "file:" + testFileDataPath,
+				"--tls-keyfile-password", "secrets:aql:missing", "--sa-address", agent.Addr(),
 			},
 			want:  []string{"--tls-keyfile-password: ", "secrets:aql:missing"},
 			class: secretagent.ErrRequestFailed,
@@ -526,7 +590,7 @@ func TestResolveSecretsTrimsKeyFilePassword(t *testing.T) {
 
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
-			af, sa := parseToolFlags(t,
+			af, sa := parseToolFlags(t, "--tls-enable",
 				"--tls-keyfile", "file:"+testFileDataPath, "--tls-keyfile-password", tt.value, "--sa-address", agent.Addr())
 
 			require.NoError(t, af.ResolveSecrets(t.Context(), sa))
@@ -567,7 +631,7 @@ func TestResolveSecretsTrimsKeyFilePasswordFromConfigFile(t *testing.T) {
 	for name, tt := range tests {
 		t.Run(name, func(t *testing.T) {
 			af, sa := parseToolConfig(t, fmt.Sprintf(
-				"[cluster]\nuser = \"admin\"\npassword = %q\ntls-keyfile = %q\ntls-keyfile-password = %q\n\n"+
+				"[cluster]\nuser = \"admin\"\npassword = %q\ntls-enable = true\ntls-keyfile = %q\ntls-keyfile-password = %q\n\n"+
 					"[secret-agent]\nsa-address = %q\n", tt.value, testFileDataPath, tt.value, agent.Addr()))
 
 			require.NoError(t, af.ResolveSecrets(t.Context(), sa))
@@ -769,7 +833,7 @@ func TestResolveSecretsPasswordLimits(t *testing.T) {
 	})
 
 	user := []string{"-U", "admin", "--sa-address", agent.Addr()}
-	keyFile := []string{"--tls-keyfile", "file:" + testFileDataPath, "--sa-address", agent.Addr()}
+	keyFile := []string{"--tls-enable", "--tls-keyfile", "file:" + testFileDataPath, "--sa-address", agent.Addr()}
 
 	tests := map[string]struct {
 		want string
@@ -853,7 +917,7 @@ func TestResolveSecretsRejectsNUL(t *testing.T) {
 	af, sa := parseToolFlags(t, "-U", "admin", "-P", "secrets:aql:nul", "--sa-address", agent.Addr())
 	require.EqualError(t, af.ResolveSecrets(t.Context(), sa), "--password: password contains a NUL byte")
 
-	af, sa = parseToolFlags(t, "--tls-keyfile", "file:"+testFileDataPath,
+	af, sa = parseToolFlags(t, "--tls-enable", "--tls-keyfile", "file:"+testFileDataPath,
 		"--tls-keyfile-password", "secrets:aql:nul", "--sa-address", agent.Addr())
 	require.EqualError(t, af.ResolveSecrets(t.Context(), sa), "--tls-keyfile-password: password contains a NUL byte")
 
@@ -944,4 +1008,34 @@ func TestNewFlagSetReadsPasswordWhenParsed(t *testing.T) {
 	af := NewDefaultAerospikeFlags()
 	require.NoError(t, af.NewFlagSet(DefaultWrapHelpString).Parse([]string{"-P", "env:TCG_TEST_PASSWORD"}))
 	require.Equal(t, "env-pass", string(af.Password))
+}
+
+func TestResolveSecretsSkipsTLSSecretsWithoutTLS(t *testing.T) {
+	agent := newTestAgent(t)
+	addr, conns := newProxy(t, "127.0.0.1:0", agent.Addr())
+
+	tests := map[string][]string{
+		"CA file":   {"--tls-cafile", "secrets:aql:ca"},
+		"cert file": {"--tls-certfile", "secrets:aql:ca"},
+		"key file":  {"--tls-keyfile", "secrets:aql:ca"},
+		"key file password": {
+			"--tls-keyfile", "file:" + testFileDataPath, "--tls-keyfile-password", "secrets:aql:keypass",
+		},
+	}
+
+	for name, args := range tests {
+		t.Run(name, func(t *testing.T) {
+			af, sa := parseToolFlags(t, append(args, "--sa-address", addr)...)
+
+			require.NoError(t, af.ResolveSecrets(t.Context(), sa))
+			require.Zero(t, conns.Load())
+		})
+	}
+
+	af, sa := parseToolConfig(t, fmt.Sprintf(
+		"[cluster]\ntls-cafile = \"secrets:aql:ca\"\ntls-keyfile = %q\ntls-keyfile-password = \"secrets:aql:keypass\"\n\n"+
+			"[secret-agent]\nsa-address = %q\n", testFileDataPath, addr))
+
+	require.NoError(t, af.ResolveSecrets(t.Context(), sa))
+	require.Zero(t, conns.Load())
 }
