@@ -2,6 +2,8 @@ package config
 
 import (
 	"fmt"
+	"maps"
+	"slices"
 	"strings"
 
 	"github.com/spf13/pflag"
@@ -72,8 +74,17 @@ func InitConfig(userProvidedCfgFile, instance string, flags *pflag.FlagSet) (str
 	return viper.ConfigFileUsed(), SetFlags(instance, flags)
 }
 
+// configSetter is a flag value that SetFlags passes its config file value as
+// read, with the section name, in place of Set, even when the flag was given
+// on the command line.
+type configSetter interface {
+	SetConfig(section string, value any) error
+}
+
 func SetFlags(instance string, flags *pflag.FlagSet) error {
 	var persistedErr error
+
+	strictKeys := map[string]map[string]bool{}
 
 	flags.VisitAll(func(f *pflag.Flag) {
 		// Convert "host" into "cluster_<instance>.host"
@@ -92,6 +103,25 @@ func SetFlags(instance string, flags *pflag.FlagSet) error {
 			return
 		}
 
+		section, key, nested := strings.Cut(alias, ".")
+		if base, _, _ := strings.Cut(configToFlagMap[f.Name], "."); nested && fallbackSections[base] {
+			if strictKeys[section] == nil {
+				strictKeys[section] = map[string]bool{}
+			}
+
+			strictKeys[section][key] = true
+		}
+
+		if setter, ok := f.Value.(configSetter); ok && nested {
+			if value, found := viper.GetStringMap(section)[key]; found {
+				if err := setter.SetConfig(section, value); err != nil {
+					persistedErr = err
+				}
+			}
+
+			return
+		}
+
 		val := viper.GetString(f.Name)
 
 		// Apply the viper config value to the flag when viper has a value
@@ -101,6 +131,14 @@ func SetFlags(instance string, flags *pflag.FlagSet) error {
 			}
 		}
 	})
+
+	for section, known := range strictKeys {
+		for _, key := range slices.Sorted(maps.Keys(viper.GetStringMap(section))) {
+			if !known[key] {
+				return fmt.Errorf("unknown key %s in the [%s] config section", key, section)
+			}
+		}
+	}
 
 	return persistedErr
 }
@@ -123,7 +161,8 @@ func BindPFlags(flags *pflag.FlagSet, section string) {
 
 // BindPFlagsWithInstanceFallback is like BindPFlags, except that with an
 // instance it reads <section>_<instance> when that section exists and <section>
-// otherwise. This matches how the Aerospike C tools read [secret-agent].
+// otherwise. This matches how the Aerospike C tools read [secret-agent]. A key
+// in the section read that is not one of the flags is an error.
 func BindPFlagsWithInstanceFallback(flags *pflag.FlagSet, section string) {
 	BindPFlags(flags, section)
 
