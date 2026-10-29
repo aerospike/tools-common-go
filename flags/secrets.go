@@ -30,7 +30,8 @@ var errSecretsNotTracked = errors.New("secret references are not tracked, use Ne
 //
 // --password is read only with a user and an auth mode other than PKI, and
 // --tls-keyfile-password only with a key file. Otherwise the value is dropped,
-// and a --password source without a user is reported to the warning handler.
+// and a --password source or secrets: value without a user is reported to the
+// warning handler.
 // --password must be at most 63 bytes and --tls-keyfile-password at most 1024
 // bytes, whatever their source. Errors name the option, or the config file key
 // when the value came from the config file.
@@ -64,7 +65,7 @@ func (af *AerospikeFlags) ResolveSecrets(ctx context.Context, sa *SecretAgentFla
 
 // SetWarningHandler sets the function ResolveSecrets passes warnings to, such
 // as a --password source that is ignored because no user is set. Without one,
-// warnings are written to standard error.
+// warnings are written to standard error after "Warning: ".
 func (af *AerospikeFlags) SetWarningHandler(handler func(msg string)) {
 	af.secretRefs.warn = handler
 }
@@ -87,7 +88,7 @@ func (af *AerospikeFlags) fetchSecrets(ctx context.Context, sa *SecretAgentFlags
 
 		secret, err := client.Resolve(ctx, target.ref)
 		if err != nil {
-			return fmt.Errorf("--%s: %w", target.name, err)
+			return fmt.Errorf("%s: %w", af.optionLabel(target.name), err)
 		}
 
 		target.set(secret)
@@ -98,7 +99,8 @@ func (af *AerospikeFlags) fetchSecrets(ctx context.Context, sa *SecretAgentFlags
 }
 
 func (af *AerospikeFlags) dropPassword(password passwordOption) {
-	if password.warnIgnored && *password.unread && hasPasswordSource(string(*password.value)) {
+	source := *password.isRef || (*password.unread && hasPasswordSource(string(*password.value)))
+	if password.warnIgnored && source {
 		af.warn(password.label + ": ignored because no user is set")
 	}
 
@@ -113,7 +115,7 @@ func (af *AerospikeFlags) warn(msg string) {
 		return
 	}
 
-	fmt.Fprintln(os.Stderr, msg)
+	fmt.Fprintln(os.Stderr, "Warning: "+msg)
 }
 
 // optionLabel names a flag in messages: the option when it was given on the

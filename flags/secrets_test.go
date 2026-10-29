@@ -652,7 +652,7 @@ func TestResolveSecretsNoUserWarning(t *testing.T) {
 		"b64 source":     {args: []string{"-P", "b64:"}, want: ignored},
 		"file source":    {args: []string{"-P", "file:/missing"}, want: ignored},
 		"literal":        {args: []string{"-P", "admin"}},
-		"secret":         {args: []string{"-P", "secrets:aql:password"}},
+		"secret":         {args: []string{"-P", "secrets:aql:password"}, want: ignored},
 		"auth pki":       {args: []string{"--auth", "pki", "-P", "env:TCG_TEST_UNSET"}},
 		"no password, key file password source": {
 			args: []string{"--tls-keyfile-password", "env:TCG_TEST_UNSET"},
@@ -684,6 +684,16 @@ func TestResolveSecretsNoUserWarningFromConfigFile(t *testing.T) {
 	warnings := collectWarnings(af)
 
 	require.NoError(t, af.ResolveSecrets(t.Context(), sa))
+	require.Equal(t, []string{"password in config file: ignored because no user is set"}, *warnings)
+}
+
+func TestResolveSecretsNoUserWarningForSecretFromConfigFile(t *testing.T) {
+	af, sa := parseToolConfig(t, fmt.Sprintf(
+		"[cluster]\npassword = \"secrets:aql:password\"\n\n[secret-agent]\nsa-address = %q\n", unreachableAgent))
+	warnings := collectWarnings(af)
+
+	require.NoError(t, af.ResolveSecrets(t.Context(), sa))
+	require.Empty(t, af.Password)
 	require.Equal(t, []string{"password in config file: ignored because no user is set"}, *warnings)
 }
 
