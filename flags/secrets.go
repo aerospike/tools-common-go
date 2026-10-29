@@ -238,6 +238,15 @@ type secretRefValue struct {
 	trim   bool
 }
 
+func (v *secretRefValue) Type() string {
+	typ := v.Value.Type()
+	if i := strings.LastIndexByte(typ, ','); i >= 0 {
+		return typ[:i+1] + "secrets:<resource>:<key>," + typ[i+1:]
+	}
+
+	return typ
+}
+
 func (v *secretRefValue) Set(val string) error {
 	if v.trim {
 		val = strings.Trim(val, asciiSpace)

@@ -420,9 +420,15 @@ func TestPasswordFlagTypeListsSources(t *testing.T) {
 
 	var flag PasswordFlag
 
-	for _, source := range []string{"env:", "env-b64:", "b64:", "file:", "secrets:"} {
+	withSecrets := NewDefaultAerospikeFlags().NewFlagSetWithSecrets(DefaultWrapHelpString).Lookup("password")
+
+	for _, source := range []string{"env:", "env-b64:", "b64:", "file:"} {
 		require.True(t, strings.Contains(flag.Type(), source), source)
+		require.True(t, strings.Contains(withSecrets.Value.Type(), source), source)
 	}
+
+	require.NotContains(t, flag.Type(), "secrets:")
+	require.Contains(t, withSecrets.Value.Type(), "secrets:<resource>:<key>")
 }
 
 func TestCertFlagTypeListsSecrets(t *testing.T) {
@@ -430,7 +436,28 @@ func TestCertFlagTypeListsSecrets(t *testing.T) {
 
 	var flag CertFlag
 
-	require.Contains(t, flag.Type(), "secrets:<resource>:<key>")
+	fs := NewDefaultAerospikeFlags().NewFlagSetWithSecrets(DefaultWrapHelpString)
+
+	require.NotContains(t, flag.Type(), "secrets:")
+
+	for _, name := range []string{"tls-cafile", "tls-certfile", "tls-keyfile"} {
+		require.Contains(t, fs.Lookup(name).Value.Type(), "secrets:<resource>:<key>", name)
+	}
+}
+
+func TestNewFlagSetHelpOmitsSecrets(t *testing.T) {
+	t.Parallel()
+
+	require.NotContains(t, NewDefaultAerospikeFlags().NewFlagSet(DefaultWrapHelpString).FlagUsages(), "secrets:")
+
+	fs := NewDefaultAerospikeFlags().NewFlagSetWithSecrets(DefaultWrapHelpString)
+
+	names := []string{"user", "password", "tls-cafile", "tls-certfile", "tls-keyfile", "tls-keyfile-password"}
+
+	for _, name := range names {
+		flag := fs.Lookup(name)
+		require.Contains(t, flag.Value.Type()+" "+flag.Usage, "secrets:<resource>:<key>", name)
+	}
 }
 
 // collectWarnings sends af's warnings to the returned slice.
@@ -865,12 +892,13 @@ func TestNewFlagSetWithSecretsPasswordUsage(t *testing.T) {
 		"3) Base64 encoded string: 'b64:<BASE64>'",
 		`4) File: 'file:<PATH>', the whole file less one trailing '\n' or`,
 		`   '\r\n'. PATH should name a regular file.`,
-		"5) String: 'PASSWORD'",
+		"5) Aerospike Secret Agent: 'secrets:<resource>:<key>'",
+		"6) String: 'PASSWORD'",
 		"Prefixes are case-sensitive. A base64 value may be line wrapped,",
 		"and one trailing newline is dropped after decoding. A 'b64:' value",
 		"on the command line is as visible as a literal password.",
-		"A password that itself begins with 'env:', 'env-b64:', 'b64:' or",
-		"'file:' must be given as 'b64:'.",
+		"A password that itself begins with 'env:', 'env-b64:', 'b64:',",
+		"'file:' or 'secrets:' must be given as 'b64:'.",
 		"The password is read only when a user is set and the auth mode is",
 		"not PKI. It must be at most 63 bytes.",
 		"A value fetched with 'secrets:' is used as-is.",
@@ -883,19 +911,21 @@ func TestNewFlagSetWithSecretsPasswordUsage(t *testing.T) {
 		"2) Base64 encoded environment variable: 'env-b64:<VAR>'",
 		"3) Base64 encoded string: 'b64:<BASE64>'",
 		"4) File: 'file:<PATH>', the first line of the file",
-		"5) String: 'PASSWORD'",
+		"5) Aerospike Secret Agent: 'secrets:<resource>:<key>'",
+		"6) String: 'PASSWORD'",
 		"Prefixes are case-sensitive. A base64 value may be line wrapped,",
 		"and one trailing newline is dropped after decoding.",
-		"A password that itself begins with 'env:', 'env-b64:', 'b64:' or",
-		"'file:' must be given as 'b64:'.",
-		"Surrounding whitespace is trimmed before the form is read.",
+		"A password that itself begins with 'env:', 'env-b64:', 'b64:',",
+		"'file:' or 'secrets:' must be given as 'b64:'.",
+		"Surrounding whitespace is trimmed before the form is read. A",
+		"password with surrounding whitespace must be given as 'b64:'.",
 		"The password is read only when a key file is set. It must be at",
 		"most 1024 bytes.",
-		"Default: none",
 		"A value fetched with 'secrets:' is used as-is.",
+		"Default: none",
 	}, strings.Split(fs.Lookup("tls-keyfile-password").Usage, "\n"))
 
-	require.Contains(t, fs.FlagUsages(), "-P, --password "+(*PasswordFlag)(nil).Type())
+	require.Contains(t, fs.FlagUsages(), "-P, --password "+fs.Lookup("password").Value.Type())
 }
 
 func TestNewFlagSetKeepsPasswordUsage(t *testing.T) {
