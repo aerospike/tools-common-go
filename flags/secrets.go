@@ -174,9 +174,13 @@ func (af *AerospikeFlags) passwordOptions() []passwordOption {
 }
 
 // read resolves an unread value. A value fetched from the Secret Agent is used
-// as is and only checked for length.
+// as is and only checked for NUL bytes and length.
 func (p passwordOption) read() error {
 	if !*p.unread {
+		if err := checkNoNUL(p.label, string(*p.value)); err != nil {
+			return err
+		}
+
 		return checkPasswordLen(p.label, "password", string(*p.value), p.maxLen)
 	}
 

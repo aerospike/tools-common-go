@@ -2,6 +2,7 @@ package flags
 
 import (
 	"bytes"
+	"io/fs"
 	"os"
 	"path/filepath"
 	"reflect"
@@ -238,6 +239,19 @@ func TestReadPasswordErrors(t *testing.T) {
 			require.EqualError(t, err, "--password: "+tt.want)
 		})
 	}
+}
+
+func TestReadPasswordMissingFileIsNotExist(t *testing.T) {
+	t.Parallel()
+
+	missing := filepath.Join(t.TempDir(), "missing")
+
+	_, err := readPassword("--password", "file:"+missing, passwordMaxLen, false)
+	require.ErrorIs(t, err, fs.ErrNotExist)
+	require.EqualError(t, err, "--password: cannot read file "+missing+": No such file or directory")
+
+	af, sa := parseToolFlags(t, "-U", "admin", "-P", "file:"+missing)
+	require.ErrorIs(t, af.ResolveSecrets(t.Context(), sa), fs.ErrNotExist)
 }
 
 func TestReadPasswordLimits(t *testing.T) {

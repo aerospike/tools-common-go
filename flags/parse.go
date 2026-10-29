@@ -1,6 +1,7 @@
 package flags
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -29,6 +30,10 @@ func fromEnv(v string) (string, error) {
 }
 
 func fromBase64(v string) (string, error) {
+	if v == "" {
+		return "", errors.New("b64: value is empty")
+	}
+
 	return decode64(v)
 }
 

@@ -111,7 +111,7 @@ func readPassword(label, value string, maxLen int, firstLine bool) (string, erro
 		password, err = passwordFromFile(label, path, maxLen, firstLine)
 		what = "value from file " + path
 	default:
-		password, what = value, "password"
+		password, what, err = value, "password", checkNoNUL(label, value)
 	}
 
 	if err != nil {
@@ -124,6 +124,15 @@ func readPassword(label, value string, maxLen int, firstLine bool) (string, erro
 func checkPasswordLen(label, what, password string, maxLen int) error {
 	if len(password) > maxLen {
 		return fmt.Errorf("%s: %s is longer than %d bytes", label, what, maxLen)
+	}
+
+	return nil
+}
+
+// checkNoNUL checks a value used as given: a literal or a fetched secret.
+func checkNoNUL(label, password string) error {
+	if strings.IndexByte(password, 0) >= 0 {
+		return fmt.Errorf("%s: password contains a NUL byte", label)
 	}
 
 	return nil
@@ -214,5 +223,21 @@ func fileReadError(label, path string, err error) error {
 		err = pathErr.Err
 	}
 
-	return fmt.Errorf("%s: cannot read file %s: %w", label, path, err)
+	return fmt.Errorf("%s: cannot read file %s: %w", label, path, capitalizedError{err})
+}
+
+// capitalizedError prints err capitalized, as the C tools print strerror().
+type capitalizedError struct{ error }
+
+func (e capitalizedError) Error() string {
+	reason := e.error.Error()
+	if reason == "" {
+		return reason
+	}
+
+	return strings.ToUpper(reason[:1]) + reason[1:]
+}
+
+func (e capitalizedError) Unwrap() error {
+	return e.error
 }
