@@ -6,6 +6,7 @@ import (
 	"net"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"testing"
 
@@ -238,18 +239,18 @@ func TestSecretAgentFlagsValidate(t *testing.T) {
 	}{
 		"address": {
 			args: []string{"--sa-address", "host:3005:x"},
-			want: "--sa-address: invalid value host:3005:x, expected <host>[:<port>] or [<ipv6>][:<port>]",
+			want: `--sa-address: invalid value "host:3005:x", expected <host>[:<port>] or [<ipv6>][:<port>]`,
 		},
 		"port": {
 			args: []string{"--sa-port", "0"},
-			want: "--sa-port: invalid value 0, expected an integer from 1 to 65535",
+			want: `--sa-port: invalid value "0", expected an integer from 1 to 65535`,
 		},
-		"port range":   {args: []string{"--sa-port", "70000"}, want: "--sa-port: invalid value 70000"},
-		"zero timeout": {args: []string{"--sa-timeout", "0"}, want: "--sa-timeout: invalid value 0"},
-		"neg timeout":  {args: []string{"--sa-timeout", "-5"}, want: "--sa-timeout: invalid value -5"},
+		"port range":   {args: []string{"--sa-port", "70000"}, want: `--sa-port: invalid value "70000"`},
+		"zero timeout": {args: []string{"--sa-timeout", "0"}, want: `--sa-timeout: invalid value "0"`},
+		"neg timeout":  {args: []string{"--sa-timeout", "-5"}, want: `--sa-timeout: invalid value "-5"`},
 		"huge timeout": {
 			args: []string{"--sa-timeout", "9223372036854775807"},
-			want: "--sa-timeout: invalid value 9223372036854775807, expected an integer from 1 to 2147483647",
+			want: `--sa-timeout: invalid value "9223372036854775807", expected an integer from 1 to 2147483647`,
 		},
 	}
 
@@ -272,9 +273,9 @@ func TestSecretAgentNewClientInvalid(t *testing.T) {
 		want string
 		args []string
 	}{
-		"address": {args: []string{"--sa-address", "host:"}, want: "--sa-address: invalid value host:"},
-		"timeout": {args: []string{"--sa-timeout", "0"}, want: "--sa-timeout: invalid value 0"},
-		"CA file": {args: []string{"--sa-ca-file", "/missing.pem"}, want: "--sa-ca-file: "},
+		"address": {args: []string{"--sa-address", "host:"}, want: `--sa-address: invalid value "host:"`},
+		"timeout": {args: []string{"--sa-timeout", "0"}, want: `--sa-timeout: invalid value "0"`},
+		"CA file": {args: []string{"--sa-ca-file", "/missing.pem"}, want: `--sa-ca-file: cannot load CA file "/missing.pem": no such file or directory`},
 	}
 
 	for name, tt := range tests {
@@ -350,7 +351,6 @@ func TestSecretAgentEmptyCAFile(t *testing.T) {
 func TestSecretAgentConfigFailsClosed(t *testing.T) {
 	agent := newTestAgent(t)
 	addr, conns := newProxy(t, "127.0.0.1:0", agent.Addr())
-	missing := filepath.Join(t.TempDir(), "missing.pem")
 
 	const (
 		section = " in the [secret-agent] config section"
@@ -367,34 +367,32 @@ func TestSecretAgentConfigFailsClosed(t *testing.T) {
 	}{
 		"unknown key":         {conf: "sa-ca-flie = \"/ca.pem\"", want: "unknown key sa-ca-flie" + section},
 		"unknown key, number": {conf: "bogus = 1", want: "unknown key bogus" + section},
-		"port array":          {conf: "sa-port = [3005]", want: "invalid value [3005] for sa-port" + port},
-		"port float":          {conf: "sa-port = 3005.5", want: "invalid value 3005.5 for sa-port" + port},
-		"port bool":           {conf: "sa-port = true", want: "invalid value true for sa-port" + port},
-		"port zero":           {conf: "sa-port = 0", want: "invalid value 0 for sa-port" + port},
-		"port empty":          {conf: "sa-port = \"\"", want: "invalid value  for sa-port" + port},
-		"port too long":       {conf: "sa-port = \"003005\"", want: "invalid value 003005 for sa-port" + port},
-		"timeout zero":        {conf: "sa-timeout = 0", want: "invalid value 0 for sa-timeout" + timeout},
-		"timeout array":       {conf: "sa-timeout = [1000]", want: "invalid value [1000] for sa-timeout" + timeout},
-		"address":             {conf: "sa-address = \"a:b:c\"", want: "invalid value a:b:c for sa-address" + address},
-		"address number":      {conf: "sa-address = 123", want: "invalid value 123 for sa-address" + address},
+		"port array":          {conf: "sa-port = [3005]", want: `invalid value "[3005]" for sa-port` + port},
+		"port float":          {conf: "sa-port = 3005.5", want: `invalid value "3005.5" for sa-port` + port},
+		"port bool":           {conf: "sa-port = true", want: `invalid value "true" for sa-port` + port},
+		"port zero":           {conf: "sa-port = 0", want: `invalid value "0" for sa-port` + port},
+		"port empty":          {conf: "sa-port = \"\"", want: `invalid value "" for sa-port` + port},
+		"port too long":       {conf: "sa-port = \"003005\"", want: `invalid value "003005" for sa-port` + port},
+		"timeout zero":        {conf: "sa-timeout = 0", want: `invalid value "0" for sa-timeout` + timeout},
+		"timeout array":       {conf: "sa-timeout = [1000]", want: `invalid value "[1000]" for sa-timeout` + timeout},
+		"address":             {conf: "sa-address = \"a:b:c\"", want: `invalid value "a:b:c" for sa-address` + address},
+		"address number":      {conf: "sa-address = 123", want: `invalid value "123" for sa-address` + address},
 		"address array": {
-			conf: "sa-address = [\"10.0.0.1\"]", want: "invalid value [10.0.0.1] for sa-address" + address,
+			conf: "sa-address = [\"10.0.0.1\"]", want: `invalid value "[10.0.0.1]" for sa-address` + address,
 		},
-		"address empty": {conf: "sa-address = \"\"", want: "invalid value  for sa-address" + address},
+		"address empty": {conf: "sa-address = \"\"", want: `invalid value "" for sa-address` + address},
 		"address space": {
-			conf: "sa-address = \" 127.0.0.1\"", want: "invalid value  127.0.0.1 for sa-address" + address,
+			conf: "sa-address = \" 127.0.0.1\"", want: `invalid value " 127.0.0.1" for sa-address` + address,
 		},
-		"CA file number":      {conf: "sa-ca-file = 1", want: "invalid value 1 for sa-ca-file" + caFile},
-		"C spelling CA array": {conf: "sa-cafile = [\"/ca.pem\"]", want: "invalid value [/ca.pem] for sa-cafile" + caFile},
-		"missing CA file":     {conf: fmt.Sprintf("sa-ca-file = %q", missing), want: "sa-ca-file" + section},
-		"missing C spelling":  {conf: fmt.Sprintf("sa-cafile = %q", missing), want: "sa-cafile" + section},
+		"CA file number":      {conf: "sa-ca-file = 1", want: `invalid value "1" for sa-ca-file` + caFile},
+		"C spelling CA array": {conf: "sa-cafile = [\"/ca.pem\"]", want: `invalid value "[/ca.pem]" for sa-cafile` + caFile},
 		"instance unknown key": {
 			conf: "[secret-agent_x]\nsa-host = \"agent\"", instance: "x",
 			want: "unknown key sa-host in the [secret-agent_x] config section",
 		},
 		"instance port": {
 			conf: "[secret-agent_x]\nsa-port = 0", instance: "x",
-			want: "invalid value 0 for sa-port in the [secret-agent_x] config section, expected an integer from 1 to 65535",
+			want: `invalid value "0" for sa-port in the [secret-agent_x] config section, expected an integer from 1 to 65535`,
 		},
 	}
 
@@ -429,7 +427,7 @@ func TestSecretAgentTimeoutDecimalOnly(t *testing.T) {
 			t.Parallel()
 
 			err := parseSecretAgentFlags(t, []string{"--sa-timeout", value}, nil).Validate()
-			require.EqualError(t, err, "--sa-timeout: invalid value "+value+", expected an integer from 1 to 2147483647")
+			require.EqualError(t, err, `--sa-timeout: invalid value "`+value+`", expected an integer from 1 to 2147483647`)
 		})
 	}
 
@@ -448,7 +446,7 @@ func TestSecretAgentConfigTimeoutDecimalOnly(t *testing.T) {
 		`"+5"`:       "+5",
 		`" 5"`:       " 5",
 		`"1.5"`:      "1.5",
-		`1.0`:        "1",
+		`1.0`:        "1.0",
 		`1.5`:        "1.5",
 		`true`:       "true",
 		`-5`:         "-5",
@@ -458,7 +456,7 @@ func TestSecretAgentConfigTimeoutDecimalOnly(t *testing.T) {
 	for value, shown := range invalid {
 		t.Run(value, func(t *testing.T) {
 			_, _, err := loadToolConfig(t, "[secret-agent]\nsa-timeout = "+value+"\n", "")
-			require.EqualError(t, err, "invalid value "+shown+want)
+			require.EqualError(t, err, `invalid value "`+shown+`"`+want)
 		})
 	}
 
@@ -542,18 +540,18 @@ func TestSecretAgentErrorLabels(t *testing.T) {
 		},
 		"config sa-port": {
 			conf:    "[secret-agent]\nsa-port = \"0\"\n",
-			want:    "invalid value 0 for sa-port in the [secret-agent] config section, expected an integer from 1 to 65535",
+			want:    `invalid value "0" for sa-port in the [secret-agent] config section, expected an integer from 1 to 65535`,
 			notWant: "--sa",
 		},
 		"config sa-timeout": {
 			conf: "[secret-agent]\nsa-timeout = 0\n",
-			want: "invalid value 0 for sa-timeout in the [secret-agent] config section," +
+			want: `invalid value "0" for sa-timeout in the [secret-agent] config section,` +
 				" expected an integer from 1 to 2147483647",
 			notWant: "--sa",
 		},
 		"config sa-address": {
 			conf: "[secret-agent]\nsa-address = \"host:\"\n",
-			want: "invalid value host: for sa-address in the [secret-agent] config section," +
+			want: `invalid value "host:" for sa-address in the [secret-agent] config section,` +
 				" expected <host>[:<port>] or [<ipv6>][:<port>]",
 			notWant: "--sa",
 		},
@@ -586,21 +584,29 @@ func TestSecretAgentFlagsValidateStrict(t *testing.T) {
 		args []string
 	}{
 		"leading space": {
-			args: []string{"--sa-address", " 127.0.0.1"}, want: "--sa-address: invalid value  127.0.0.1" + address,
+			args: []string{"--sa-address", " 127.0.0.1"}, want: `--sa-address: invalid value " 127.0.0.1"` + address,
 		},
 		"inner space": {
-			args: []string{"--sa-address", "host name"}, want: "--sa-address: invalid value host name" + address,
+			args: []string{"--sa-address", "host name"}, want: `--sa-address: invalid value "host name"` + address,
 		},
 		"trailing tab": {
-			args: []string{"--sa-address", "127.0.0.1\t"}, want: "--sa-address: invalid value 127.0.0.1\t" + address,
+			args: []string{"--sa-address", "127.0.0.1\t"}, want: "--sa-address: invalid value \"127.0.0.1\t\"" + address,
 		},
-		"empty address": {args: []string{"--sa-address", ""}, want: "--sa-address: invalid value " + address},
-		"empty port":    {args: []string{"--sa-port", ""}, want: "--sa-port: invalid value " + port},
-		"long port":     {args: []string{"--sa-port", "003005"}, want: "--sa-port: invalid value 003005" + port},
+		"empty address": {args: []string{"--sa-address", ""}, want: `--sa-address: invalid value ""` + address},
+		"empty port":    {args: []string{"--sa-port", ""}, want: `--sa-port: invalid value ""` + port},
+		"long port":     {args: []string{"--sa-port", "003005"}, want: `--sa-port: invalid value "003005"` + port},
 		"long address port": {
-			args: []string{"--sa-address", "h:003005"}, want: "--sa-address: invalid value h:003005" + address,
+			args: []string{"--sa-address", "h:003005"}, want: `--sa-address: invalid value "h:003005"` + address,
 		},
-		"empty port, equals": {args: []string{"--sa-port="}, want: "--sa-port: invalid value " + port},
+		"empty port, equals": {args: []string{"--sa-port="}, want: `--sa-port: invalid value ""` + port},
+		"empty CA file": {
+			args: []string{"--sa-ca-file", ""},
+			want: `--sa-ca-file: invalid value "", expected a path to a CA certificate file`,
+		},
+		"empty C spelling CA file": {
+			args: []string{"--sa-cafile="},
+			want: `--sa-cafile: invalid value "", expected a path to a CA certificate file`,
+		},
 	}
 
 	for name, tt := range tests {
@@ -778,4 +784,309 @@ func TestSecretAgentTLSVerifiesCAAndHost(t *testing.T) {
 		require.ErrorIs(t, err, secretagent.ErrRequestFailed)
 		require.ErrorContains(t, err, "certificate")
 	})
+}
+
+func TestSecretAgentCAFileReadOnlyWhenFetching(t *testing.T) {
+	agent := secretagenttest.NewTLSServer(t, secretagenttest.Secrets{"aql": {"user": encode(resolvedUser)}})
+	addr, conns := newProxy(t, "127.0.0.1:0", agent.Addr())
+	missing := filepath.Join(t.TempDir(), "missing.pem")
+	notPEM := filepath.Join(t.TempDir(), "not.pem")
+	require.NoError(t, os.WriteFile(notPEM, []byte("not a certificate\n"), 0o600))
+
+	t.Run("not read without a secret", func(t *testing.T) {
+		for _, conf := range []string{"sa-ca-file = %q\n", "sa-cafile = %q\n"} {
+			require.NoError(t, resolveToolConfig(t, fmt.Sprintf("[secret-agent]\n"+conf, missing), ""), conf)
+		}
+
+		require.NoError(t, resolveToolConfig(t, "", "", "--sa-ca-file", missing))
+	})
+
+	for _, option := range []string{"--sa-ca-file", "--sa-cafile"} {
+		t.Run(option+" beats a config file CA file that cannot be read", func(t *testing.T) {
+			af, sa := parseToolConfigArgs(t, fmt.Sprintf(
+				"[cluster]\nuser = \"secrets:aql:user\"\n\n[secret-agent]\nsa-address = %q\nsa-ca-file = %q\n",
+				agent.Addr(), missing), "", option, agent.CAFile())
+
+			require.NoError(t, af.ResolveSecrets(t.Context(), sa))
+			require.Equal(t, resolvedUser, af.User)
+		})
+	}
+
+	tests := map[string]struct {
+		conf     string
+		instance string
+		want     string
+		args     []string
+	}{
+		"--sa-ca-file": {
+			args: []string{"--sa-ca-file", missing}, want: `--sa-ca-file: cannot load CA file "` + missing + `": no such file or directory`,
+		},
+		"--sa-cafile": {args: []string{"--sa-cafile", notPEM}, want: `--sa-cafile: cannot load CA file "` + notPEM + `": no certificates found`},
+		"sa-ca-file": {
+			conf: fmt.Sprintf("[secret-agent]\nsa-ca-file = %q\n", missing),
+			want: `sa-ca-file in the [secret-agent] config section: cannot load CA file "` + missing + `": no such file or directory`,
+		},
+		"sa-cafile": {
+			conf: fmt.Sprintf("[secret-agent]\nsa-cafile = %q\n", notPEM),
+			want: `sa-cafile in the [secret-agent] config section: cannot load CA file "` + notPEM + `": no certificates found`,
+		},
+		"instance sa-ca-file": {
+			conf:     fmt.Sprintf("[secret-agent]\nsa-ca-file = %q\n\n[secret-agent_x]\nsa-ca-file = %q\n", notPEM, missing),
+			instance: "x",
+			want:     `sa-ca-file in the [secret-agent_x] config section: cannot load CA file "` + missing + `": no such file or directory`,
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			before := conns.Load()
+
+			err := resolveToolConfig(t, tt.conf, tt.instance,
+				append([]string{"--sa-address", addr, "-U", "secrets:aql:user"}, tt.args...)...)
+
+			require.EqualError(t, err, tt.want)
+			require.ErrorIs(t, err, secretagent.ErrInvalidConfig)
+			require.Equal(t, before, conns.Load())
+		})
+	}
+}
+
+func TestSecretAgentOnlySelectedSectionIsRead(t *testing.T) {
+	const invalid = "sa-port = 0\nsa-timeout = \"x\"\nsa-ca-file = \"\"\nbogus = 1\n"
+
+	tests := map[string]struct {
+		conf     string
+		instance string
+		want     string
+	}{
+		"instance section, invalid default section": {
+			conf:     "[secret-agent]\n" + invalid + "\n[secret-agent_x]\nsa-address = \"h:4100\"\n",
+			instance: "x", want: "h:4100",
+		},
+		"empty instance section, invalid default section": {
+			conf: "[secret-agent]\n" + invalid + "\n[secret-agent_x]\n", instance: "x", want: "127.0.0.1:3005",
+		},
+		"no instance, invalid instance section": {
+			conf: "[secret-agent]\nsa-address = \"h:4100\"\n\n[secret-agent_x]\n" + invalid, want: "h:4100",
+		},
+		"other instance, invalid instance section": {
+			conf:     "[secret-agent]\nsa-address = \"h:4100\"\n\n[secret-agent_x]\n" + invalid,
+			instance: "y", want: "h:4100",
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			af, sa := parseToolConfigArgs(t, tt.conf, tt.instance)
+			require.NoError(t, af.ResolveSecrets(t.Context(), sa))
+
+			address, err := sa.address()
+			require.NoError(t, err)
+			require.Equal(t, tt.want, address)
+		})
+	}
+}
+
+func TestSecretAgentConfigKeysIgnoreCase(t *testing.T) {
+	_, sa := parseToolConfig(t, "[secret-agent]\nSA-Address = \"h:4100\"\nSa-Timeout = 250\n")
+
+	address, err := sa.address()
+	require.NoError(t, err)
+	require.Equal(t, "h:4100", address)
+	require.Equal(t, 250, sa.Timeout)
+
+	_, _, err = loadToolConfig(t, "[secret-agent]\nSA-PORT = 0\n", "")
+	require.ErrorContains(t, err, `invalid value "0" for `)
+	require.ErrorContains(t, err, " in the [secret-agent] config section, expected an integer from 1 to 65535")
+}
+
+func resolveToolConfigFiles(t *testing.T, home, user, instance string, args ...string) (*AerospikeFlags, error) {
+	t.Helper()
+
+	af, sa, err := loadToolConfigFiles(t, home, user, instance, args...)
+	if err == nil {
+		err = af.ResolveSecrets(t.Context(), sa)
+	}
+
+	return af, err
+}
+
+func TestSecretAgentConfigFilesMergeKeyByKey(t *testing.T) {
+	agent := secretagenttest.NewTLSServer(t, secretagenttest.Secrets{"aql": {"user": encode(resolvedUser)}})
+
+	af, err := resolveToolConfigFiles(t,
+		fmt.Sprintf("[cluster_x]\nuser = \"secrets:aql:user\"\n\n[secret-agent_x]\nsa-address = \"127.0.0.1:1\"\n"+
+			"sa-ca-file = %q\n", agent.CAFile()),
+		fmt.Sprintf("[secret-agent]\nsa-address = %q\n", agent.Addr()), "x")
+
+	require.NoError(t, err)
+	require.Equal(t, resolvedUser, af.User)
+}
+
+func TestSecretAgentConfigFilesAddressAndPort(t *testing.T) {
+	tests := map[string]struct {
+		home string
+		user string
+		want string
+		args []string
+	}{
+		"later address port beats earlier sa-port": {home: `sa-port = "4000"`, user: `sa-address = "h:4100"`, want: "h:4100"},
+		"later sa-port beats earlier address port": {home: `sa-address = "h:4100"`, user: `sa-port = "4200"`, want: "h:4200"},
+		"later address without a port keeps the earlier address port": {
+			home: `sa-address = "h:4100"`, user: `sa-address = "h2"`, want: "h2:4100",
+		},
+		"later address without a port keeps the earlier sa-port": {
+			home: "sa-address = \"h:4100\"\nsa-port = \"4200\"", user: `sa-address = "h2"`, want: "h2:4200",
+		},
+		"sa-port beats the address port in the same file": {
+			user: "sa-address = \"h:4100\"\nsa-port = \"4200\"", want: "h:4200",
+		},
+		"command line beats both files": {
+			home: `sa-address = "h:4100"`, user: `sa-port = "4200"`, args: []string{"--sa-address", "h3:4300"},
+			want: "h3:4300",
+		},
+		"command line host keeps the port of the files": {
+			home: `sa-port = "4200"`, user: `sa-address = "h:4100"`, args: []string{"--sa-address", "h3"},
+			want: "h3:4100",
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			_, sa, err := loadToolConfigFiles(t, "[secret-agent]\n"+tt.home+"\n", "[secret-agent]\n"+tt.user+"\n", "",
+				tt.args...)
+			require.NoError(t, err)
+
+			address, err := sa.address()
+			require.NoError(t, err)
+			require.Equal(t, tt.want, address)
+		})
+	}
+}
+
+func TestSecretAgentConfigFilesCAFile(t *testing.T) {
+	agent := secretagenttest.NewTLSServer(t, secretagenttest.Secrets{"aql": {"user": encode(resolvedUser)}})
+	missing := filepath.Join(t.TempDir(), "missing.pem")
+
+	tests := map[string]struct {
+		home     string
+		user     string
+		instance string
+		want     string
+	}{
+		"later sa-cafile beats earlier sa-ca-file": {
+			home: fmt.Sprintf("[secret-agent]\nsa-address = %q\nsa-ca-file = %q\n", agent.Addr(), missing),
+			user: fmt.Sprintf("[secret-agent]\nsa-cafile = %q\n", agent.CAFile()),
+		},
+		"later sa-ca-file beats earlier sa-cafile": {
+			home: fmt.Sprintf("[secret-agent]\nsa-address = %q\nsa-cafile = %q\n", agent.Addr(), missing),
+			user: fmt.Sprintf("[secret-agent]\nsa-ca-file = %q\n", agent.CAFile()),
+		},
+		"sa-ca-file beats sa-cafile in the same file": {
+			home: fmt.Sprintf("[secret-agent]\nsa-address = %q\n", agent.Addr()),
+			user: fmt.Sprintf("[secret-agent]\nsa-ca-file = %q\nsa-cafile = %q\n", agent.CAFile(), missing),
+		},
+		"earlier instance section names the CA file": {
+			home:     fmt.Sprintf("[secret-agent_x]\nsa-address = \"127.0.0.1:1\"\nsa-ca-file = %q\n", missing),
+			user:     fmt.Sprintf("[secret-agent]\nsa-address = %q\n", agent.Addr()),
+			instance: "x",
+			want:     `sa-ca-file in the [secret-agent_x] config section: cannot load CA file "` + missing + `": no such file or directory`,
+		},
+		"later instance section names the CA file": {
+			home:     fmt.Sprintf("[secret-agent]\nsa-address = %q\nsa-ca-file = %q\n", agent.Addr(), agent.CAFile()),
+			user:     fmt.Sprintf("[secret-agent_x]\nsa-cafile = %q\n", missing),
+			instance: "x",
+			want:     `sa-cafile in the [secret-agent_x] config section: cannot load CA file "` + missing + `": no such file or directory`,
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			cluster := "[cluster]\n"
+			if tt.instance != "" {
+				cluster = "[cluster_" + tt.instance + "]\n"
+			}
+
+			af, err := resolveToolConfigFiles(t, cluster+"user = \"secrets:aql:user\"\n\n"+tt.home, tt.user, tt.instance)
+
+			if tt.want != "" {
+				require.EqualError(t, err, tt.want)
+				return
+			}
+
+			require.NoError(t, err)
+			require.Equal(t, resolvedUser, af.User)
+		})
+	}
+}
+
+func TestSecretAgentConfigFilesCheckedPerFile(t *testing.T) {
+	// Errors name the file, since up to three files are read.
+	tests := map[string]struct {
+		home     string
+		user     string
+		instance string
+		file     string
+		want     string
+	}{
+		"invalid value in an earlier file": {
+			home: "[secret-agent]\nsa-port = 0\n",
+			user: "[secret-agent]\nsa-port = \"3005\"\n",
+			file: "astools-flags-test.conf",
+			want: `invalid value "0" for sa-port in the [secret-agent] config section, expected an integer from 1 to 65535`,
+		},
+		"unknown key in an earlier file": {
+			home: "[secret-agent]\nbogus = 1\n",
+			user: "[secret-agent]\nsa-port = \"3005\"\n",
+			file: "astools-flags-test.conf",
+			want: "unknown key bogus in the [secret-agent] config section",
+		},
+		"invalid value in a later instance section": {
+			home:     "[secret-agent]\nsa-port = \"3005\"\n",
+			user:     "[secret-agent_x]\nsa-timeout = 0\n",
+			instance: "x",
+			file:     "user.conf",
+			want: `invalid value "0" for sa-timeout in the [secret-agent_x] config section,` +
+				" expected an integer from 1 to 2147483647",
+		},
+		"unselected sections in each file are ignored": {
+			home:     "[secret-agent]\nsa-port = 0\n\n[secret-agent_x]\nsa-port = \"3005\"\n",
+			user:     "[secret-agent_y]\nbogus = 1\n",
+			instance: "x",
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			_, _, err := loadToolConfigFiles(t, tt.home, tt.user, tt.instance)
+
+			if tt.want == "" {
+				require.NoError(t, err)
+				return
+			}
+
+			require.Error(t, err)
+			require.Regexp(t, `^config file \S*/`+regexp.QuoteMeta(tt.file)+`: `+regexp.QuoteMeta(tt.want)+`$`,
+				err.Error())
+		})
+	}
+}
+
+func TestSecretAgentInstanceSectionsMergePerFile(t *testing.T) {
+	// As in the C tools, a later file's sa-address port beats an earlier file's
+	// sa-port, in instance sections too.
+	_, sa, err := loadToolConfigFiles(t, "[secret-agent_x]\nsa-port = \"4000\"\n",
+		"[secret-agent_x]\nsa-address = \"agent:5000\"\n", "x")
+	require.NoError(t, err)
+
+	address, err := sa.address()
+	require.NoError(t, err)
+	require.Equal(t, "agent:5000", address)
+}
+
+func TestSecretAgentEmptyTimeout(t *testing.T) {
+	t.Parallel()
+
+	err := parseSecretAgentFlags(t, []string{"--sa-timeout", ""}, nil).Validate()
+	require.EqualError(t, err, `--sa-timeout: invalid value "", expected an integer from 1 to 2147483647`)
 }

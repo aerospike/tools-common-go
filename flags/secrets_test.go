@@ -174,6 +174,54 @@ func loadToolConfig(t *testing.T, conf, instance string, args ...string) (*Aeros
 	return af, sa, err
 }
 
+// loadToolConfigFiles is loadToolConfig with config.InitConfigFiles: home is
+// the $HOME/.aerospike file and user the --config-file, each written only when
+// not empty. A config name of its own keeps a real /etc/aerospike file out.
+func loadToolConfigFiles(t *testing.T, home, user, instance string, args ...string) (
+	*AerospikeFlags, *SecretAgentFlags, error,
+) {
+	t.Helper()
+
+	homeDir := t.TempDir()
+	t.Setenv("HOME", homeDir)
+
+	config.SetDefaultConfName("astools-flags-test")
+	t.Cleanup(func() { config.SetDefaultConfName(config.DefaultConfName) })
+
+	if home != "" {
+		require.NoError(t, os.Mkdir(filepath.Join(homeDir, ".aerospike"), 0o700))
+		require.NoError(t, os.WriteFile(filepath.Join(homeDir, ".aerospike", "astools-flags-test.conf"),
+			[]byte(home), 0o600))
+	}
+
+	userFile := ""
+	if user != "" {
+		userFile = filepath.Join(t.TempDir(), "user.conf")
+		require.NoError(t, os.WriteFile(userFile, []byte(user), 0o600))
+	}
+
+	config.Reset()
+	t.Cleanup(config.Reset)
+
+	af := NewDefaultAerospikeFlags()
+	sa := NewDefaultSecretAgentFlags()
+
+	fs := af.NewFlagSetWithSecrets(DefaultWrapHelpString)
+	config.BindPFlags(fs, "cluster")
+
+	saFlags := sa.NewFlagSet(DefaultWrapHelpString)
+	config.BindPFlagsWithInstanceFallback(saFlags, "secret-agent")
+	fs.AddFlagSet(saFlags)
+
+	if err := fs.Parse(args); err != nil {
+		return af, sa, err
+	}
+
+	_, err := config.InitConfigFiles(userFile, instance, fs)
+
+	return af, sa, err
+}
+
 // resolveToolConfig loads conf and args as a tool does and resolves the
 // secrets, returning the first error.
 func resolveToolConfig(t *testing.T, conf, instance string, args ...string) error {
@@ -497,11 +545,39 @@ func TestResolveSecretsErrors(t *testing.T) {
 func TestResolveSecretsInvalidAgentFlags(t *testing.T) {
 	t.Parallel()
 
-	af, sa := parseToolFlags(t, "-U", "admin", "-P", "admin", "--sa-port", "0")
-	require.NoError(t, af.ResolveSecrets(t.Context(), sa))
+	tests := map[string]struct {
+		want string
+		args []string
+	}{
+		"address": {
+			args: []string{"--sa-address", "[localhost]:3005"},
+			want: `--sa-address: invalid value "[localhost]:3005", expected <host>[:<port>] or [<ipv6>][:<port>]`,
+		},
+		"port": {args: []string{"--sa-port", "0"}, want: `--sa-port: invalid value "0", expected an integer from 1 to 65535`},
+		"timeout": {
+			args: []string{"--sa-timeout", "2147483648"},
+			want: `--sa-timeout: invalid value "2147483648", expected an integer from 1 to 2147483647`,
+		},
+		"CA file": {
+			args: []string{"--sa-ca-file", ""},
+			want: `--sa-ca-file: invalid value "", expected a path to a CA certificate file`,
+		},
+		"C spelling CA file": {
+			args: []string{"--sa-cafile", ""},
+			want: `--sa-cafile: invalid value "", expected a path to a CA certificate file`,
+		},
+	}
 
-	af, sa = parseToolFlags(t, "-U", "admin", "-P", "secrets:aql:password", "--sa-port", "0")
-	require.ErrorContains(t, af.ResolveSecrets(t.Context(), sa), "--sa-port: invalid value 0")
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			for _, password := range []string{"admin", "secrets:aql:password"} {
+				af, sa := parseToolFlags(t, append([]string{"-U", "admin", "-P", password}, tt.args...)...)
+				require.EqualError(t, af.ResolveSecrets(t.Context(), sa), tt.want, password)
+			}
+		})
+	}
 }
 
 func TestPasswordFlagTypeListsSources(t *testing.T) {
