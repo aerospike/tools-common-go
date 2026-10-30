@@ -515,3 +515,74 @@ func TestConcurrentUse(t *testing.T) {
 		require.NoError(t, err)
 	}
 }
+
+func rawResponse(body string) []byte {
+	msg := make([]byte, wire.HeaderSize, wire.HeaderSize+len(body))
+	binary.BigEndian.PutUint32(msg[:4], wire.Magic)
+	binary.BigEndian.PutUint32(msg[4:], uint32(len(body))) //nolint:gosec // test bodies are tiny
+
+	return append(msg, body...)
+}
+
+func TestAgentErrorField(t *testing.T) {
+	t.Parallel()
+
+	value := `"SecretValue":"aHVudGVyMg=="`
+
+	tests := map[string]struct {
+		want error
+		body string
+	}{
+		"empty error":   {body: `{` + value + `,"Error":""}`, want: secretagent.ErrRequestFailed},
+		"error":         {body: `{` + value + `,"Error":"denied"}`, want: secretagent.ErrRequestFailed},
+		"error first":   {body: `{"Error":"",` + value + `}`, want: secretagent.ErrRequestFailed},
+		"numeric error": {body: `{` + value + `,"Error":1}`, want: secretagent.ErrInvalidResponse},
+		"null error":    {body: `{` + value + `,"Error":null}`},
+		"no error key":  {body: `{` + value + `}`},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			addr := rawAgent(t, func(conn net.Conn) {
+				var req wire.Request
+				if wire.Read(conn, &req) == nil {
+					_, _ = conn.Write(rawResponse(tt.body))
+				}
+			})
+			client := newClient(t, secretagent.Config{Address: addr, Timeout: testTimeout, Base64: true})
+
+			got, err := client.GetSecret(t.Context(), testResource, testKey)
+			if tt.want == nil {
+				require.NoError(t, err)
+				require.Equal(t, testSecret, got)
+
+				return
+			}
+
+			requireClass(t, err, tt.want)
+			require.Empty(t, got)
+			require.NotContains(t, err.Error(), testSecret)
+		})
+	}
+}
+
+func TestRequestEscaping(t *testing.T) {
+	t.Parallel()
+
+	agent := secretagenttest.NewServer(t, secretagenttest.Secrets{
+		testResource: {passwordKey: testSecret},
+		"other":      {passwordKey: "other-secret"},
+	})
+	client := newClient(t, agentConfig(agent))
+
+	for _, ref := range []string{
+		`secrets:res","Resource":"other:password`,
+		"secrets:res:p\\" + "u0061ssword",
+	} {
+		got, err := client.Resolve(t.Context(), ref)
+		requireClass(t, err, secretagent.ErrRequestFailed)
+		require.Empty(t, got, ref)
+	}
+}

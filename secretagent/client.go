@@ -184,8 +184,12 @@ func exchange(conn net.Conn, ref Ref) (string, error) {
 		return "", fmt.Errorf("%w: read response for %s: %w", ErrRequestFailed, ref, err)
 	}
 
-	if res.Error != "" {
-		return "", fmt.Errorf("%w: agent error for %s: %s", ErrRequestFailed, ref, res.Error)
+	if res.Error != nil {
+		if *res.Error == "" {
+			return "", fmt.Errorf("%w: agent error for %s", ErrRequestFailed, ref)
+		}
+
+		return "", fmt.Errorf("%w: agent error for %s: %s", ErrRequestFailed, ref, *res.Error)
 	}
 
 	if res.SecretValue == "" {
