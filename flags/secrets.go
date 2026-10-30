@@ -25,6 +25,9 @@ var errSecretsNotTracked = errors.New("secret references are not tracked, use Ne
 // flags and the config file are parsed, so option order does not matter, and
 // before NewAerospikeConfig.
 //
+// The Secret Agent flags are checked on every call, even when no secrets:
+// value is used. The agent's CA file is read only when a secret is fetched.
+//
 // The --tls-keyfile-password text has surrounding whitespace trimmed before
 // its form, secrets: included, is read. --password is used as given.
 //
@@ -39,6 +42,10 @@ var errSecretsNotTracked = errors.New("secret references are not tracked, use Ne
 func (af *AerospikeFlags) ResolveSecrets(ctx context.Context, sa *SecretAgentFlags) error {
 	if !af.secretRefs.tracked {
 		return errSecretsNotTracked
+	}
+
+	if err := sa.Validate(); err != nil {
+		return err
 	}
 
 	passwords := af.passwordOptions()

@@ -1,7 +1,9 @@
 package flags
 
 import (
+	"errors"
 	"fmt"
+	"io/fs"
 	"math"
 	"net"
 	"os"
@@ -37,6 +39,7 @@ var secretAgentExpected = map[string]string{
 // C tools and are read from the [secret-agent] config section.
 type SecretAgentFlags struct {
 	flagSet         *pflag.FlagSet
+	configFile      map[string]int
 	Address         string `mapstructure:"sa-address"`
 	Port            string `mapstructure:"sa-port"`
 	CAFile          string `mapstructure:"sa-ca-file"`
@@ -45,6 +48,7 @@ type SecretAgentFlags struct {
 	section         string
 	confAddressPort string
 	Timeout         int `mapstructure:"sa-timeout"`
+	file            int
 }
 
 func NewDefaultSecretAgentFlags() *SecretAgentFlags {
@@ -53,8 +57,9 @@ func NewDefaultSecretAgentFlags() *SecretAgentFlags {
 
 // NewFlagSet returns a new pflag.FlagSet with the Secret Agent flags defined.
 // Values set in the returned FlagSet will be stored in the SecretAgentFlags.
-// Command line values are checked when the agent is used, and config file
-// values when the config file is loaded.
+// Command line values are checked by Validate and ResolveSecrets, and config
+// file values when the config file is loaded. The CA file is read only when a
+// secret is fetched.
 func (sf *SecretAgentFlags) NewFlagSet(fmtUsage UsageFormatter) *pflag.FlagSet {
 	f := &pflag.FlagSet{}
 	f.Var(sf.value(saAddress, &sf.Address), saAddress, fmtUsage(`"<host>[:<port>]" or "[<ipv6>][:<port>]".`+
@@ -74,7 +79,7 @@ func (sf *SecretAgentFlags) NewFlagSet(fmtUsage UsageFormatter) *pflag.FlagSet {
 	return f
 }
 
-// Validate checks the address, port and timeout without contacting the agent.
+// Validate checks the flags without reading the CA file or contacting the agent.
 func (sf *SecretAgentFlags) Validate() error {
 	_, err := sf.config()
 
@@ -90,10 +95,31 @@ func (sf *SecretAgentFlags) NewClient() (*secretagent.Client, error) {
 	}
 
 	if cfg.TLS, err = secretagent.NewTLSConfig(secretagent.TLSOptions{CAFile: sf.caFile()}); err != nil {
-		return nil, fmt.Errorf("%s: %w", sf.label(sf.caFileOption()), err)
+		return nil, &caFileError{err: err, label: sf.label(sf.caFileOption()), path: sf.caFile()}
 	}
 
 	return secretagent.NewClient(cfg)
+}
+
+type caFileError struct {
+	err   error
+	label string
+	path  string
+}
+
+func (e *caFileError) Error() string {
+	reason := "no certificates found"
+
+	var pathErr *fs.PathError
+	if errors.As(e.err, &pathErr) {
+		reason = pathErr.Err.Error()
+	}
+
+	return e.label + `: cannot load CA file "` + e.path + `": ` + reason
+}
+
+func (e *caFileError) Unwrap() error {
+	return e.err
 }
 
 // caFileOption picks --sa-ca-file or --sa-cafile, the C tools' spelling that a
@@ -123,19 +149,17 @@ func (sf *SecretAgentFlags) config() (secretagent.Config, error) {
 
 	timeout := sf.Timeout
 
-	if sf.timeout != "" {
+	if sf.timeout != "" || sf.changed(saTimeout) {
 		var ok bool
 		if timeout, ok = parseTimeout(sf.timeout); !ok {
-			return secretagent.Config{}, fmt.Errorf("--sa-timeout: invalid value %s, expected %s",
-				sf.timeout, secretAgentExpected[saTimeout])
+			return secretagent.Config{}, invalidOption(saTimeout, sf.timeout)
 		}
 	} else if timeout < 1 || timeout > math.MaxInt32 {
-		return secretagent.Config{}, fmt.Errorf("--sa-timeout: invalid value %d, expected %s",
-			timeout, secretAgentExpected[saTimeout])
+		return secretagent.Config{}, invalidOption(saTimeout, strconv.Itoa(timeout))
 	}
 
 	if option := sf.caFileOption(); sf.caFile() == "" && sf.changed(option) {
-		return secretagent.Config{}, fmt.Errorf("--%s: invalid value , expected %s", option, secretAgentExpected[option])
+		return secretagent.Config{}, invalidOption(option, "")
 	}
 
 	return secretagent.Config{
@@ -154,13 +178,13 @@ func (sf *SecretAgentFlags) address() (string, error) {
 	if sf.Address != "" || sf.changed(saAddress) {
 		var ok bool
 		if host, port, ok = parseSecretAgentAddress(sf.Address); !ok {
-			return "", fmt.Errorf("--sa-address: invalid value %s, expected %s", sf.Address, secretAgentExpected[saAddress])
+			return "", invalidOption(saAddress, sf.Address)
 		}
 	}
 
 	if sf.Port != "" || sf.changed(saPort) {
 		if !validPort(sf.Port) {
-			return "", fmt.Errorf("--sa-port: invalid value %s, expected %s", sf.Port, secretAgentExpected[saPort])
+			return "", invalidOption(saPort, sf.Port)
 		}
 
 		addressWins := port != "" && sf.changed(saAddress) && !sf.changed(saPort)
@@ -198,6 +222,10 @@ func (sf *SecretAgentFlags) label(name string) string {
 
 func configLabel(name, section string) string {
 	return fmt.Sprintf("%s in the [%s] config section", name, section)
+}
+
+func invalidOption(name, value string) error {
+	return fmt.Errorf(`--%s: invalid value "%s", expected %s`, name, value, secretAgentExpected[name])
 }
 
 func (sf *SecretAgentFlags) value(name string, value *string) *secretAgentValue {
@@ -248,27 +276,50 @@ func (v *secretAgentValue) set(value string) {
 func (v *secretAgentValue) SetConfig(section string, value any) error {
 	text, ok := configText(value, v.name == saPort || v.name == saTimeout)
 	if !ok || !v.valid(text) {
-		return fmt.Errorf("invalid value %v for %s, expected %s", value, configLabel(v.name, section),
-			secretAgentExpected[v.name])
+		return fmt.Errorf(`invalid value "%s" for %s, expected %s`, configValueText(value),
+			configLabel(v.name, section), secretAgentExpected[v.name])
+	}
+
+	switch v.name {
+	case saAddress:
+		if _, port, _ := parseSecretAgentAddress(text); port != "" {
+			v.sf.confAddressPort = port
+			v.sf.dropEarlierFile(saPort, &v.sf.Port)
+		}
+	case saLegacyCAFile:
+		v.sf.dropEarlierFile(saCAFile, &v.sf.CAFile)
 	}
 
 	if v.name == saCAFile || v.name == saLegacyCAFile {
-		if _, err := secretagent.NewTLSConfig(secretagent.TLSOptions{CAFile: text}); err != nil {
-			return fmt.Errorf("%s: %w", configLabel(v.name, section), err)
-		}
+		v.sf.section = section
 	}
-
-	if v.name == saAddress {
-		_, v.sf.confAddressPort, _ = parseSecretAgentAddress(text)
-	}
-
-	v.sf.section = section
 
 	if !v.sf.changed(v.name) {
 		v.set(text)
+
+		if v.sf.configFile == nil {
+			v.sf.configFile = map[string]int{}
+		}
+
+		v.sf.configFile[v.name] = v.sf.file
 	}
 
 	return nil
+}
+
+// SetConfigFile is called by config.InitConfigFiles before the SetConfig
+// calls of each config file, with the position of that file.
+func (v *secretAgentValue) SetConfigFile(index int) {
+	v.sf.file = index
+}
+
+// dropEarlierFile clears a value an earlier config file set, so that, as in
+// the C tools, a later file's sa-address port beats an earlier sa-port and its
+// sa-cafile an earlier sa-ca-file.
+func (sf *SecretAgentFlags) dropEarlierFile(name string, value *string) {
+	if file, ok := sf.configFile[name]; ok && file < sf.file {
+		*value = ""
+	}
 }
 
 func (v *secretAgentValue) valid(text string) bool {
@@ -297,6 +348,22 @@ func configText(value any, number bool) (string, bool) {
 	}
 
 	return "", false
+}
+
+// configValueText shows a config file value as written, so 1.0 does not read
+// as the valid integer 1.
+func configValueText(value any) string {
+	f, ok := value.(float64)
+	if !ok {
+		return fmt.Sprint(value)
+	}
+
+	text := strconv.FormatFloat(f, 'g', -1, 64)
+	if !strings.ContainsAny(text, ".eEnN") {
+		text += ".0"
+	}
+
+	return text
 }
 
 // parseSecretAgentAddress accepts <host>[:<port>] and [<ipv6>][:<port>]. An
