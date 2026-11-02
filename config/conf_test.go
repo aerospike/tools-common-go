@@ -397,10 +397,11 @@ func setupConfigFiles(t *testing.T) (system, home string) {
 	Reset()
 	t.Cleanup(Reset)
 
-	dir := systemConfDir
+	dir, dirs := systemConfDir, confDirs
 	systemConfDir = t.TempDir()
+	confDirs = []string{".", systemConfDir}
 
-	t.Cleanup(func() { systemConfDir = dir })
+	t.Cleanup(func() { systemConfDir, confDirs = dir, dirs })
 
 	homeDir := t.TempDir()
 	t.Setenv("HOME", homeDir)
@@ -559,6 +560,34 @@ func TestInitConfigFilesUnreadableDefaultFileSkipped(t *testing.T) {
 
 	_, err = InitConfigFiles(user, "", newGroupFlags(t, "group1", false))
 	require.ErrorContains(t, err, "failed to read config file "+user)
+}
+
+func TestInitConfigFilesUnopenableFilesSkipped(t *testing.T) {
+	// As in the C tools: a default or included file that cannot be opened for
+	// any reason but being missing is skipped with a warning.
+	system, home := setupConfigFiles(t)
+	writeConfig(t, system, "[group1]\nint = 1\n")
+
+	require.NoError(t, os.Remove(filepath.Dir(home)))
+	writeConfig(t, filepath.Dir(home), "")
+
+	loop := filepath.Join(t.TempDir(), "loop.conf")
+	require.NoError(t, os.Symlink(loop, loop))
+
+	user := writeConfig(t, filepath.Join(t.TempDir(), "user.conf"), fmt.Sprintf("[include]\nfile = %q\n", loop))
+	flagSet := newGroupFlags(t, "group1", false)
+
+	var (
+		files []string
+		err   error
+	)
+
+	stderr := captureStderr(t, func() { files, err = InitConfigFiles(user, "", flagSet) })
+	require.NoError(t, err)
+	require.Equal(t, []string{system, user}, files)
+	requireGroupFlags(t, flagSet, "", 1, false)
+	require.Equal(t, "Warning: cannot read config file "+home+": Not a directory\n"+
+		"Warning: cannot read config file "+loop+": Too many levels of symbolic links\n", stderr)
 }
 
 func TestInitConfigFilesSelectSectionsPerFile(t *testing.T) {

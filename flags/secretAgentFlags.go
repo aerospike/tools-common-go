@@ -6,7 +6,6 @@ import (
 	"io/fs"
 	"math"
 	"net"
-	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -49,6 +48,7 @@ type SecretAgentFlags struct {
 	confAddressPort string
 	Timeout         int `mapstructure:"sa-timeout"`
 	file            int
+	warnLegacyCA    bool
 }
 
 func NewDefaultSecretAgentFlags() *SecretAgentFlags {
@@ -59,7 +59,8 @@ func NewDefaultSecretAgentFlags() *SecretAgentFlags {
 // Values set in the returned FlagSet will be stored in the SecretAgentFlags.
 // Command line values are checked by Validate and ResolveSecrets, and config
 // file values when the config file is loaded. The CA file is read only when a
-// secret is fetched.
+// secret is fetched. ResolveSecrets reports the deprecation of --sa-cafile to
+// the warning handler.
 func (sf *SecretAgentFlags) NewFlagSet(fmtUsage UsageFormatter) *pflag.FlagSet {
 	f := &pflag.FlagSet{}
 	f.Var(sf.value(saAddress, &sf.Address), saAddress, fmtUsage(`"<host>[:<port>]" or "[<ipv6>][:<port>]".`+
@@ -113,6 +114,7 @@ func (e *caFileError) Error() string {
 	var pathErr *fs.PathError
 	if errors.As(e.err, &pathErr) {
 		reason = pathErr.Err.Error()
+		reason = strings.ToUpper(reason[:1]) + reason[1:]
 	}
 
 	return e.label + `: cannot load CA file "` + e.path + `": ` + reason
@@ -148,6 +150,9 @@ func (sf *SecretAgentFlags) config() (secretagent.Config, error) {
 	}
 
 	timeout := sf.Timeout
+	if timeout == 0 {
+		timeout = defaultSecretAgentTimeoutMs
+	}
 
 	if sf.timeout != "" || sf.changed(saTimeout) {
 		var ok bool
@@ -247,8 +252,11 @@ func (v *secretAgentValue) String() string {
 }
 
 func (v *secretAgentValue) Type() string {
-	if v.name == saTimeout {
+	switch v.name {
+	case saTimeout:
 		return "int"
+	case saPort:
+		return "port"
 	}
 
 	return "string"
@@ -256,7 +264,7 @@ func (v *secretAgentValue) Type() string {
 
 func (v *secretAgentValue) Set(value string) error {
 	if v.name == saLegacyCAFile {
-		fmt.Fprintln(os.Stderr, "Warning: Argument --sa-cafile is deprecated. Use --sa-ca-file instead.")
+		v.sf.warnLegacyCA = true
 	}
 
 	v.set(value)
@@ -419,6 +427,8 @@ func isIPv6(host string) bool {
 	return ip != nil && ip.To4() == nil
 }
 
+// validPort accepts at most 5 digits, as asadm does, where asbackup, aql and
+// asbench also accept a longer zero-padded port.
 func validPort(port string) bool {
 	if port == "" || len(port) > 5 || strings.TrimLeft(port, "0123456789") != "" {
 		return false
