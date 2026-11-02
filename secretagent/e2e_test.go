@@ -7,9 +7,11 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"io"
@@ -47,6 +49,9 @@ const (
 	otherValue   = "other-value"
 	pemValue     = "-----BEGIN TEST-----\nAQIDBA==\n-----END TEST-----\n"
 	unicodeValue = "pässwörd ✓"
+	wrongValue   = "wrong-secret"
+	keyPassValue = "k3y-pass"
+	envLikeValue = "env:SECRETAGENT_E2E_UNSET"
 )
 
 var e2e struct {
@@ -235,7 +240,10 @@ func pullImage(ctx context.Context, cli *docker.Client, ref string) error {
 
 func writeSecrets(dir string) error {
 	files := map[string]map[string]string{
-		"aql.json":   {passwordKey: testSecret, "pem": pemValue, "unicode": unicodeValue},
+		"aql.json": {
+			passwordKey: testSecret, "pem": pemValue, "unicode": unicodeValue, "wrong": wrongValue,
+			"keypass": keyPassValue, "keypass-newline": keyPassValue + "\n", "envlike": envLikeValue,
+		},
 		"other.json": {passwordKey: otherValue},
 	}
 
@@ -635,6 +643,75 @@ func e2eToolConfig(
 	require.NoError(t, err)
 
 	return af, sa
+}
+
+// TestE2EFetchedSecretsReachTheClient checks that the client policy a tool
+// logs in with, and loads its TLS key with, holds the values fetched from the
+// agent, used as is.
+func TestE2EFetchedSecretsReachTheClient(t *testing.T) {
+	t.Run("user and password", func(t *testing.T) {
+		for ref, want := range map[string]string{
+			"secrets:aql:password":        testSecret,
+			"secrets:aql:wrong":           wrongValue,
+			"secrets:aql:keypass-newline": keyPassValue + "\n",
+			"secrets:aql:envlike":         envLikeValue,
+		} {
+			af, sa := e2eToolConfig(t, "", "", "-U", "secrets:other:password", "-P", ref, "--sa-address", e2e.plainAddr)
+			require.NoError(t, af.ResolveSecrets(t.Context(), sa), ref)
+
+			policy, err := af.NewAerospikeConfig().NewClientPolicy()
+			require.NoError(t, err, ref)
+			require.Equal(t, otherValue, policy.User, ref)
+			require.Equal(t, want, policy.Password, ref)
+		}
+	})
+
+	t.Run("TLS key file password", func(t *testing.T) {
+		keyFile := encryptedKeyFile(t, e2e.pki.ClientKeyFile, keyPassValue)
+
+		for ref, ok := range map[string]bool{
+			"secrets:aql:keypass":         true,
+			"secrets:aql:wrong":           false,
+			"secrets:aql:keypass-newline": false,
+		} {
+			af, sa := e2eToolConfig(t, "", "", "--tls-enable", "--tls-cafile", e2e.pki.CAFile,
+				"--tls-certfile", e2e.pki.ClientCertFile, "--tls-keyfile", keyFile, "--tls-keyfile-password", ref,
+				"--sa-address", e2e.plainAddr)
+			require.NoError(t, af.ResolveSecrets(t.Context(), sa), ref)
+
+			policy, err := af.NewAerospikeConfig().NewClientPolicy()
+			if !ok {
+				require.Error(t, err, ref)
+				require.Regexp(t, "failed to (decrypt PEM Block|add certificate and key)", err.Error(), ref)
+
+				continue
+			}
+
+			require.NoError(t, err, ref)
+			require.Len(t, policy.TlsConfig.Certificates, 1, ref)
+		}
+	})
+}
+
+// encryptedKeyFile writes keyFile encrypted with password in the legacy PEM
+// form the Aerospike tools load.
+func encryptedKeyFile(t *testing.T, keyFile, password string) string {
+	t.Helper()
+
+	data, err := os.ReadFile(keyFile)
+	require.NoError(t, err)
+
+	block, _ := pem.Decode(data)
+	require.NotNil(t, block)
+
+	//nolint:staticcheck // The tools load legacy encrypted PEM keys, so the test must write one.
+	encrypted, err := x509.EncryptPEMBlock(rand.Reader, block.Type, block.Bytes, []byte(password), x509.PEMCipherAES256)
+	require.NoError(t, err)
+
+	path := filepath.Join(t.TempDir(), "encrypted-key.pem")
+	require.NoError(t, os.WriteFile(path, pem.EncodeToMemory(encrypted), 0o600))
+
+	return path
 }
 
 // e2eToolConfigFiles is e2eToolConfig with config.InitConfigFiles and conf as
