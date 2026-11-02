@@ -1207,6 +1207,40 @@ func TestSecretAgentCAFileInIncludedFile(t *testing.T) {
 	}
 }
 
+func TestSecretAgentDottedInstance(t *testing.T) {
+	agent := secretagenttest.NewTLSServer(t, secretagenttest.Secrets{"aql": {"user": encode(resolvedUser)}})
+	conf := fmt.Sprintf("[\"cluster_a.b\"]\nuser = \"secrets:aql:user\"\n\n[\"secret-agent_a.b\"]\nsa-address = %q\n"+
+		"sa-ca-file = %q\n", agent.Addr(), agent.CAFile())
+
+	t.Run("InitConfig", func(t *testing.T) {
+		af, sa, err := loadToolConfig(t, conf, "a.b")
+		require.NoError(t, err)
+		require.NoError(t, af.ResolveSecrets(t.Context(), sa))
+		require.Equal(t, resolvedUser, af.User)
+	})
+
+	t.Run("InitConfigFiles", func(t *testing.T) {
+		af, err := resolveToolConfigFiles(t, "", conf, "a.b")
+		require.NoError(t, err)
+		require.Equal(t, resolvedUser, af.User)
+	})
+
+	for name, tt := range map[string]struct{ line, want string }{
+		"bad value":   {"sa-port = 0\n", `invalid value "0" for sa-port in the [secret-agent_a.b] config section`},
+		"unknown key": {"bogus = 1\n", "unknown key bogus in the [secret-agent_a.b] config section"},
+	} {
+		t.Run(name+" InitConfig", func(t *testing.T) {
+			_, _, err := loadToolConfig(t, "[\"secret-agent_a.b\"]\n"+tt.line, "a.b")
+			require.ErrorContains(t, err, tt.want)
+		})
+
+		t.Run(name+" InitConfigFiles", func(t *testing.T) {
+			_, _, err := loadToolConfigFiles(t, "", "[\"secret-agent_a.b\"]\n"+tt.line, "a.b")
+			require.ErrorContains(t, err, tt.want)
+		})
+	}
+}
+
 func TestSecretAgentInstanceSectionCase(t *testing.T) {
 	const (
 		conf = "[secret-agent]\nsa-ca-file = \"/ca.pem\"\n\n[secret-agent_PROD]\nsa-address = \"127.0.0.1:1\"\n"
@@ -1221,7 +1255,8 @@ func TestSecretAgentInstanceSectionCase(t *testing.T) {
 
 	t.Run("InitConfig", func(t *testing.T) {
 		_, _, err := loadToolConfig(t, conf, "prod")
-		require.EqualError(t, err, want)
+		require.Error(t, err)
+		require.Regexp(t, `^config file \S*/astools.conf: `+regexp.QuoteMeta(want)+`$`, err.Error())
 	})
 
 	t.Run("exact case", func(t *testing.T) {

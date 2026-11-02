@@ -100,7 +100,11 @@ func checkFileSectionCase(file, instance string) error {
 		return fmt.Errorf("failed to read config file: %w", err)
 	}
 
-	return checkSectionCase(raw, instance)
+	if err := checkSectionCase(raw, instance); err != nil {
+		return fmt.Errorf("config file %s: %w", file, err)
+	}
+
+	return nil
 }
 
 // Directory of the system-wide file InitConfigFiles reads.
@@ -120,7 +124,11 @@ const maxIncludeLevel = 3
 // The files of a file's [include] section are read right after it: file, then
 // every regular file under directory in name order, without following links to
 // directories. A missing included file is skipped, and an included file more
-// than 3 levels deep is an error.
+// than 3 levels deep is an error. Any other error inside an included
+// directory, such as an entry that cannot be parsed or a subdirectory that
+// cannot be read, fails the load, where the C tools skip the entry, since it
+// may hold the Secret Agent CA file. Warnings, such as for a file that cannot
+// be opened, are written to standard error.
 //
 // Values merge key by key, a later file wins, and the command line wins over
 // all files. A section bound with BindPFlagsWithInstanceFallback is selected in
@@ -168,7 +176,7 @@ func (l *configLoader) load(path string, level int, optional bool) error {
 
 		var pathErr *fs.PathError
 		if optional && errors.As(err, &pathErr) && pathErr.Op == "open" {
-			fmt.Fprintf(os.Stderr, "Warning: cannot read config file %s: %s\n", path, errnoText(err))
+			warnCannotRead(path, err)
 			return nil
 		}
 
@@ -219,7 +227,7 @@ func (l *configLoader) include(path string, raw map[string]any, level int) error
 		case !strings.EqualFold(key, "file") && !strings.EqualFold(key, "directory"):
 			return fmt.Errorf("config file %s: unknown key %s in the [include] config section", path, key)
 		case !ok:
-			return fmt.Errorf("config file %s: invalid value %v for %s in the [include] config section, expected a path",
+			return fmt.Errorf(`config file %s: invalid value "%v" for %s in the [include] config section, expected a path`,
 				path, section[key], key)
 		case strings.EqualFold(key, "file"):
 			files = append(files, value)
@@ -257,7 +265,17 @@ func (l *configLoader) loadDir(from, dir string, level int) error {
 			if err := l.loadDir(from, path, level); err != nil {
 				return err
 			}
-		} else if info, err := os.Stat(path); err == nil && info.Mode().IsRegular() {
+
+			continue
+		}
+
+		info, err := os.Stat(path)
+		if err != nil {
+			warnCannotRead(path, err)
+			continue
+		}
+
+		if info.Mode().IsRegular() {
 			if err := l.load(path, level, true); err != nil {
 				return err
 			}
@@ -265,6 +283,10 @@ func (l *configLoader) loadDir(from, dir string, level int) error {
 	}
 
 	return nil
+}
+
+func warnCannotRead(path string, err error) {
+	fmt.Fprintf(os.Stderr, "Warning: cannot read config file %s: %s\n", path, errnoText(err))
 }
 
 // checkSectionCase rejects a section that matches a section bound with
@@ -312,11 +334,38 @@ func selectSections(file *viper.Viper, instance string) map[string]any {
 			// A copy: viper keeps the merged map, and a later file's merge must
 			// not write into this file's own section.
 			settings[base] = maps.Clone(file.GetStringMap(section))
-			delete(settings, strings.ToLower(section))
+			deleteKey(settings, strings.ToLower(section))
 		}
 	}
 
 	return settings
+}
+
+// deleteKey deletes key from settings, nested by its dots as viper nests them.
+func deleteKey(settings map[string]any, key string) {
+	path := strings.Split(key, ".")
+
+	for _, name := range path[:len(path)-1] {
+		next, ok := settings[name].(map[string]any)
+		if !ok {
+			return
+		}
+
+		settings = next
+	}
+
+	delete(settings, path[len(path)-1])
+}
+
+// splitKey splits a viper key at its last dot into a section and a flag name,
+// since an instance name may hold dots but a flag name does not.
+func splitKey(key string) (section, name string, nested bool) {
+	i := strings.LastIndex(key, ".")
+	if i < 0 {
+		return "", key, false
+	}
+
+	return key[:i], key[i+1:], true
 }
 
 // fallbackSection is <base>_<instance> when that is a table in v, and base
@@ -376,8 +425,8 @@ func setFlags(instance string, flags *pflag.FlagSet, files []*viper.Viper) error
 			return
 		}
 
-		section, key, nested := strings.Cut(alias, ".")
-		if base, _, _ := strings.Cut(configToFlagMap[f.Name], "."); nested && fallbackSections[base] {
+		section, key, nested := splitKey(alias)
+		if base, _, _ := splitKey(configToFlagMap[f.Name]); nested && fallbackSections[base] {
 			if strictKeys[section] == nil {
 				strictKeys[section] = map[string]bool{}
 			}
@@ -431,7 +480,7 @@ func setConfigFile(index int, file *viper.Viper, instance string, flags *pflag.F
 
 	flags.VisitAll(func(f *pflag.Flag) {
 		setter, ok := f.Value.(configSetter)
-		section, key, nested := strings.Cut(aliasIn(file, f.Name, instance), ".")
+		section, key, nested := splitKey(aliasIn(file, f.Name, instance))
 
 		if !ok || !nested {
 			return

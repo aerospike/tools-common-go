@@ -6,6 +6,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"regexp"
 	"testing"
 
 	"github.com/spf13/cobra"
@@ -694,14 +695,43 @@ func TestInitConfigFilesSectionNameCase(t *testing.T) {
 				setupConfigFiles(t)
 				user := writeConfig(t, filepath.Join(t.TempDir(), "user.conf"), tt.conf)
 
-				want := tt.want
-				if loader == "InitConfigFiles" {
-					want = "config file " + user + ": " + want
-				}
-
-				require.EqualError(t, load(user, tt.instance, newGroupFlags(t, "group1", true)), want)
+				err := load(user, tt.instance, newGroupFlags(t, "group1", true))
+				require.EqualError(t, err, "config file "+user+": "+tt.want)
 			})
 		}
+	}
+
+	const (
+		upper = "[GROUP1]\nstr = \"upper\"\n"
+		want  = ": the [GROUP1] config section differs from [group1] only in case"
+	)
+
+	t.Run("included file", func(t *testing.T) {
+		setupConfigFiles(t)
+		include := writeConfig(t, filepath.Join(t.TempDir(), "include.conf"), upper)
+		user := writeConfig(t, filepath.Join(t.TempDir(), "user.conf"), fmt.Sprintf("[include]\nfile = %q\n", include))
+
+		_, err := InitConfigFiles(user, "", newGroupFlags(t, "group1", true))
+		require.EqualError(t, err, "config file "+include+want)
+	})
+
+	t.Run("toml file", func(t *testing.T) {
+		setupConfigFiles(t)
+		user := writeConfig(t, filepath.Join(t.TempDir(), "user.toml"), upper)
+
+		_, err := InitConfig(user, "", newGroupFlags(t, "group1", true))
+		require.EqualError(t, err, "config file "+user+want)
+	})
+
+	for _, name := range []string{DefaultConfName + ".toml", DefaultConfName + ".conf"} {
+		t.Run("default search "+name, func(t *testing.T) {
+			setupConfigFiles(t)
+			writeConfig(t, name, upper)
+
+			_, err := InitConfig("", "", newGroupFlags(t, "group1", true))
+			require.Error(t, err)
+			require.Regexp(t, `^config file \S*`+regexp.QuoteMeta(name+want)+`$`, err.Error())
+		})
 	}
 
 	setupConfigFiles(t)
@@ -775,6 +805,64 @@ func TestInitConfigFilesIncludeDirectory(t *testing.T) {
 	requireGroupFlags(t, flagSet, "linked", 2, true)
 }
 
+func TestInitConfigFilesIncludeDirectoryBrokenLinks(t *testing.T) {
+	setupConfigFiles(t)
+
+	include := t.TempDir()
+	dangling := filepath.Join(include, "dangling.conf")
+	loop := filepath.Join(include, "loop.conf")
+	require.NoError(t, os.Symlink(filepath.Join(include, "missing"), dangling))
+	require.NoError(t, os.Symlink(loop, loop))
+	a := writeConfig(t, filepath.Join(include, "a.conf"), "[group1]\nint = 1\n")
+
+	user := writeConfig(t, filepath.Join(t.TempDir(), "user.conf"), fmt.Sprintf("[include]\ndirectory = %q\n", include))
+	flagSet := newGroupFlags(t, "group1", false)
+
+	var (
+		files []string
+		err   error
+	)
+
+	stderr := captureStderr(t, func() { files, err = InitConfigFiles(user, "", flagSet) })
+	require.NoError(t, err)
+	require.Equal(t, []string{user, a}, files)
+	requireGroupFlags(t, flagSet, "", 1, false)
+	require.Equal(t, "Warning: cannot read config file "+dangling+": No such file or directory\n"+
+		"Warning: cannot read config file "+loop+": Too many levels of symbolic links\n", stderr)
+}
+
+func TestInitConfigFilesDottedInstance(t *testing.T) {
+	const conf = "[group1]\nstr = \"base\"\n\n[\"group1_a.b\"]\nstr = \"dotted\"\nint = 2\n"
+
+	for loader, load := range loaders {
+		t.Run(loader, func(t *testing.T) {
+			setupConfigFiles(t)
+			user := writeConfig(t, filepath.Join(t.TempDir(), "user.conf"), conf)
+			flagSet := newGroupFlags(t, "group1", true)
+
+			require.NoError(t, load(user, "a.b", flagSet))
+			requireGroupFlags(t, flagSet, "dotted", 2, false)
+		})
+
+		t.Run(loader+" unknown key", func(t *testing.T) {
+			setupConfigFiles(t)
+			user := writeConfig(t, filepath.Join(t.TempDir(), "user.conf"), conf+"bogus = 1\n")
+
+			err := load(user, "a.b", newGroupFlags(t, "group1", true))
+			require.ErrorContains(t, err, "unknown key bogus in the [group1_a.b] config section")
+		})
+	}
+
+	t.Run("unknown key in a file without the instance section", func(t *testing.T) {
+		system, _ := setupConfigFiles(t)
+		writeConfig(t, system, "[group1]\nbogus = 1\n")
+		user := writeConfig(t, filepath.Join(t.TempDir(), "user.conf"), conf)
+
+		_, err := InitConfigFiles(user, "a.b", newGroupFlags(t, "group1", true))
+		require.EqualError(t, err, "config file "+system+": unknown key bogus in the [group1] config section")
+	})
+}
+
 func TestInitConfigFilesIncludeFileBeforeDirectory(t *testing.T) {
 	setupConfigFiles(t)
 
@@ -844,7 +932,7 @@ func TestInitConfigFilesIncludeErrors(t *testing.T) {
 		},
 		"not a string": {
 			include: "file = 1\n",
-			want:    "invalid value 1 for file in the [include] config section, expected a path",
+			want:    `invalid value "1" for file in the [include] config section, expected a path`,
 		},
 		"missing directory": {
 			include: fmt.Sprintf("directory = %q\n", filepath.Join(dir, "missing")),
@@ -872,6 +960,32 @@ func TestInitConfigFilesIncludeErrors(t *testing.T) {
 			require.ErrorContains(t, err, "failed to read config file ")
 		})
 	}
+
+	// Unlike the C tools, which skip a bad entry of an included directory, any
+	// error there fails the load, since the entry may hold the agent CA.
+	t.Run("directory holding its includer", func(t *testing.T) {
+		setupConfigFiles(t)
+		self := t.TempDir()
+		user := writeConfig(t, filepath.Join(self, "user.conf"), fmt.Sprintf("[include]\ndirectory = %q\n", self))
+
+		_, err := InitConfigFiles(user, "", newGroupFlags(t, "group1", false))
+		require.ErrorContains(t, err, "[include] is nested more than 3 levels deep")
+	})
+
+	t.Run("unreadable subdirectory", func(t *testing.T) {
+		if os.Geteuid() == 0 {
+			t.Skip("root can read any directory")
+		}
+
+		setupConfigFiles(t)
+		include := t.TempDir()
+		sub := filepath.Join(include, "sub")
+		require.NoError(t, os.Mkdir(sub, 0))
+		user := writeConfig(t, filepath.Join(t.TempDir(), "user.conf"), fmt.Sprintf("[include]\ndirectory = %q\n", include))
+
+		_, err := InitConfigFiles(user, "", newGroupFlags(t, "group1", false))
+		require.EqualError(t, err, "config file "+user+": cannot read config directory "+sub+": Permission denied")
+	})
 
 	t.Run("missing file is skipped", func(t *testing.T) {
 		setupConfigFiles(t)
