@@ -1239,6 +1239,56 @@ func TestSecretAgentDottedInstance(t *testing.T) {
 			require.ErrorContains(t, err, tt.want)
 		})
 	}
+
+	const otherInstance = "[secret-agent]\nbogus = 1\n\n[\"secret-agent_a.b\"]\nsa-timeout = 10\n"
+
+	t.Run("unknown key next to the section of another instance InitConfig", func(t *testing.T) {
+		_, _, err := loadToolConfig(t, otherInstance, "a")
+		require.ErrorContains(t, err, "unknown key bogus in the [secret-agent] config section")
+	})
+
+	t.Run("unknown key next to the section of another instance InitConfigFiles", func(t *testing.T) {
+		_, _, err := loadToolConfigFiles(t, "", otherInstance, "a")
+		require.ErrorContains(t, err, "unknown key bogus in the [secret-agent] config section")
+	})
+}
+
+func TestSecretAgentUnquotedDottedInstance(t *testing.T) {
+	agent := secretagenttest.NewTLSServer(t, secretagenttest.Secrets{"aql": {"user": encode(resolvedUser)}})
+	conf := fmt.Sprintf("[\"cluster_a.b\"]\nuser = \"secrets:aql:user\"\n\n[secret-agent]\nsa-ca-file = %q\n\n"+
+		"[secret-agent_a.b]\nsa-address = %q\n", agent.CAFile(), agent.Addr())
+
+	const want = `the [secret-agent_a.b] config section must be quoted as ["secret-agent_a.b"]`
+
+	t.Run("InitConfig", func(t *testing.T) {
+		af, sa, err := loadToolConfig(t, conf, "a.b")
+		if err == nil {
+			err = af.ResolveSecrets(t.Context(), sa)
+		}
+
+		require.ErrorContains(t, err, want)
+	})
+
+	t.Run("InitConfigFiles", func(t *testing.T) {
+		_, err := resolveToolConfigFiles(t, "", conf, "a.b")
+		require.ErrorContains(t, err, want)
+	})
+
+	quoted := fmt.Sprintf("[\"cluster_a.b\"]\nuser = \"secrets:aql:user\"\n\n[\"secret-agent_a.b\"]\nsa-address = %q\n"+
+		"sa-ca-file = %q\n\n[secret-agent_a.b]\nsa-address = \"127.0.0.1:1\"\n", agent.Addr(), agent.CAFile())
+
+	t.Run("quoted section next to a nested one InitConfig", func(t *testing.T) {
+		af, sa, err := loadToolConfig(t, quoted, "a.b")
+		require.NoError(t, err)
+		require.NoError(t, af.ResolveSecrets(t.Context(), sa))
+		require.Equal(t, resolvedUser, af.User)
+	})
+
+	t.Run("quoted section next to a nested one InitConfigFiles", func(t *testing.T) {
+		af, err := resolveToolConfigFiles(t, "", quoted, "a.b")
+		require.NoError(t, err)
+		require.Equal(t, resolvedUser, af.User)
+	})
 }
 
 func TestSecretAgentInstanceSectionCase(t *testing.T) {

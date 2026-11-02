@@ -846,6 +846,20 @@ func TestE2EFlagsAndConfigFile(t *testing.T) {
 		require.Equal(t, testSecret, string(af.Password))
 	})
 
+	t.Run("quoted instance section with a dot next to a nested one", func(t *testing.T) {
+		conf := fmt.Sprintf("[\"cluster_a.b\"]\n%s[\"secret-agent_a.b\"]\nsa-address = %q\nsa-ca-file = %q\n\n"+
+			"[secret-agent_a.b]\nsa-address = %q\n", cluster, e2e.tlsAddr, ca, unreachableAddr)
+
+		af, sa := e2eToolConfig(t, conf, "a.b")
+		require.NoError(t, af.ResolveSecrets(t.Context(), sa))
+		require.Equal(t, testSecret, string(af.Password))
+
+		af, sa = e2eToolConfigFiles(t, conf, "a.b")
+		require.NoError(t, af.ResolveSecrets(t.Context(), sa))
+		require.Equal(t, otherValue, af.User)
+		require.Equal(t, testSecret, string(af.Password))
+	})
+
 	t.Run("CA file in an included file", func(t *testing.T) {
 		dir := t.TempDir()
 		include := filepath.Join(dir, "include.conf")

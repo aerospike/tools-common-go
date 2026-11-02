@@ -861,6 +861,86 @@ func TestInitConfigFilesDottedInstance(t *testing.T) {
 		_, err := InitConfigFiles(user, "a.b", newGroupFlags(t, "group1", true))
 		require.EqualError(t, err, "config file "+system+": unknown key bogus in the [group1] config section")
 	})
+
+	for loader, load := range loaders {
+		t.Run(loader+" unknown key next to the section of another instance", func(t *testing.T) {
+			setupConfigFiles(t)
+			user := writeConfig(t, filepath.Join(t.TempDir(), "user.conf"),
+				"[group1]\nbogus = 1\n\n[\"group1_a.b\"]\nstr = \"dotted\"\n")
+
+			err := load(user, "a", newGroupFlags(t, "group1", true))
+			require.ErrorContains(t, err, "unknown key bogus in the [group1] config section")
+		})
+	}
+
+	t.Run("unknown key in another file than the section of another instance", func(t *testing.T) {
+		system, _ := setupConfigFiles(t)
+		writeConfig(t, system, "[group1]\nbogus = 1\n")
+		user := writeConfig(t, filepath.Join(t.TempDir(), "user.conf"), conf)
+
+		_, err := InitConfigFiles(user, "a", newGroupFlags(t, "group1", true))
+		require.EqualError(t, err, "config file "+system+": unknown key bogus in the [group1] config section")
+	})
+}
+
+func TestInitConfigFilesUnquotedDottedInstance(t *testing.T) {
+	// An unquoted [group1_a.b] is table b in table group1_a. The C tools look up
+	// the whole name as a root key, so they do not read it for instance a.b.
+	for name, tt := range map[string]struct{ conf, instance string }{
+		"nested header":          {"[group1]\nstr = \"base\"\n\n[group1_a.b]\nstr = \"nested\"\n", "a.b"},
+		"inline table":           {"group1_a = { b = { str = \"nested\" } }\n\n[group1]\nstr = \"base\"\n", "a.b"},
+		"header in another case": {"[group1]\nstr = \"base\"\n\n[Group1_a.b]\nstr = \"nested\"\n", "a.b"},
+		"partly quoted header":   {"[group1]\nstr = \"base\"\n\n[\"group1_a.b\".c]\nstr = \"nested\"\n", "a.b.c"},
+	} {
+		want := fmt.Sprintf(`the [group1_%s] config section must be quoted as ["group1_%[1]s"]`, tt.instance)
+
+		for loader, load := range loaders {
+			t.Run(name+" "+loader, func(t *testing.T) {
+				setupConfigFiles(t)
+				user := writeConfig(t, filepath.Join(t.TempDir(), "user.conf"), tt.conf)
+
+				err := load(user, tt.instance, newGroupFlags(t, "group1", true))
+				require.EqualError(t, err, "config file "+user+": "+want)
+			})
+		}
+	}
+
+	for name, tt := range map[string]struct{ file, conf string }{
+		"YAML nested":  {"user.yaml", "group1:\n  str: base\ngroup1_a:\n  b:\n    str: nested\n"},
+		"YAML literal": {"user.yaml", "group1:\n  str: base\ngroup1_a.b:\n  str: literal\n"},
+		"JSON nested":  {"user.json", `{"group1": {"str": "base"}, "group1_a": {"b": {"str": "nested"}}}`},
+	} {
+		t.Run(name+" InitConfig", func(t *testing.T) {
+			setupConfigFiles(t)
+			user := writeConfig(t, filepath.Join(t.TempDir(), tt.file), tt.conf)
+
+			_, err := InitConfig(user, "a.b", newGroupFlags(t, "group1", true))
+			require.EqualError(t, err,
+				"config file "+user+": the [group1_a.b] config section needs a .conf or .toml config file")
+		})
+	}
+
+	t.Run("YAML without the section InitConfig", func(t *testing.T) {
+		setupConfigFiles(t)
+		user := writeConfig(t, filepath.Join(t.TempDir(), "user.yaml"), "group1:\n  str: base\n")
+		flagSet := newGroupFlags(t, "group1", true)
+
+		_, err := InitConfig(user, "a.b", flagSet)
+		require.NoError(t, err)
+		requireGroupFlags(t, flagSet, "base", 0, false)
+	})
+
+	for loader, load := range loaders {
+		t.Run("quoted header next to a nested one "+loader, func(t *testing.T) {
+			setupConfigFiles(t)
+			user := writeConfig(t, filepath.Join(t.TempDir(), "user.conf"),
+				"[group1]\nstr = \"base\"\n\n[\"group1_a.b\"]\nstr = \"quoted\"\n\n[group1_a.b]\nstr = \"nested\"\n")
+			flagSet := newGroupFlags(t, "group1", true)
+
+			require.NoError(t, load(user, "a.b", flagSet))
+			requireGroupFlags(t, flagSet, "quoted", 0, false)
+		})
+	}
 }
 
 func TestInitConfigFilesIncludeFileBeforeDirectory(t *testing.T) {

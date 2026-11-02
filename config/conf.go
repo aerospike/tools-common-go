@@ -41,7 +41,9 @@ func SetDefaultConfName(name string) {
 
 // InitConfig reads in config file and ENV variables if set. Should be called
 // from the root commands PersistentPreRunE function with the flags of the current command.
-// It does not follow [include]; InitConfigFiles does.
+// It does not follow [include]; InitConfigFiles does. An instance section
+// bound with BindPFlagsWithInstanceFallback whose name has a dot is read only
+// from a .conf or .toml file.
 func InitConfig(userProvidedCfgFile, instance string, flags *pflag.FlagSet) (string, error) {
 	if userProvidedCfgFile != "" {
 		// Use config file from the flag.
@@ -81,15 +83,33 @@ func InitConfig(userProvidedCfgFile, instance string, flags *pflag.FlagSet) (str
 	file := viper.ConfigFileUsed()
 
 	if ext := filepath.Ext(file); ext == ".conf" || ext == ".toml" {
-		if err := checkFileSectionCase(file, instance); err != nil {
+		if err := checkFileSectionNames(file, instance); err != nil {
 			return "", err
 		}
+	} else if err := checkDottedSections(instance); err != nil {
+		return "", fmt.Errorf("config file %s: %w", file, err)
 	}
 
 	return file, SetFlags(instance, flags)
 }
 
-func checkFileSectionCase(file, instance string) error {
+// checkDottedSections rejects an instance section whose name has a dot in a
+// config file that is not TOML, where viper cannot tell it from a nested one.
+func checkDottedSections(instance string) error {
+	if !strings.Contains(instance, ".") {
+		return nil
+	}
+
+	for _, base := range slices.Sorted(maps.Keys(fallbackSections)) {
+		if name := base + "_" + instance; isTable(viper.GetViper(), name) {
+			return fmt.Errorf("the [%s] config section needs a .conf or .toml config file", name)
+		}
+	}
+
+	return nil
+}
+
+func checkFileSectionNames(file, instance string) error {
 	data, err := os.ReadFile(file)
 	if err != nil {
 		return fmt.Errorf("failed to read config file: %w", err)
@@ -100,7 +120,7 @@ func checkFileSectionCase(file, instance string) error {
 		return fmt.Errorf("failed to read config file: %w", err)
 	}
 
-	if err := checkSectionCase(raw, instance); err != nil {
+	if err := checkSectionNames(raw, viper.GetViper(), instance); err != nil {
 		return fmt.Errorf("config file %s: %w", file, err)
 	}
 
@@ -132,8 +152,9 @@ const maxIncludeLevel = 3
 //
 // Values merge key by key, a later file wins, and the command line wins over
 // all files. A section bound with BindPFlagsWithInstanceFallback is selected in
-// each file before the merge, and a section whose name matches only when case
-// is ignored is an error. It returns the files read, in order.
+// each file before the merge. A section whose name matches only when case is
+// ignored, or an instance section with a dot that is not quoted, is an error.
+// It returns the files read, in order.
 func InitConfigFiles(userProvidedCfgFile, instance string, flags *pflag.FlagSet) ([]string, error) {
 	paths := []string{filepath.Join(systemConfDir, confName+".conf")}
 
@@ -192,16 +213,16 @@ func (l *configLoader) load(path string, level int, optional bool) error {
 		return fmt.Errorf("config file %s: [include] is nested more than %d levels deep", path, maxIncludeLevel)
 	}
 
-	if err := checkSectionCase(raw, l.instance); err != nil {
-		return fmt.Errorf("config file %s: %w", path, err)
-	}
-
 	file := viper.New()
 	file.SetConfigFile(path)
 	file.SetConfigType("toml")
 
 	if err := file.ReadConfig(bytes.NewReader(data)); err != nil {
 		return fmt.Errorf("failed to read config file %s: %w", path, err)
+	}
+
+	if err := checkSectionNames(raw, file, l.instance); err != nil {
+		return fmt.Errorf("config file %s: %w", path, err)
 	}
 
 	if err := viper.MergeConfigMap(selectSections(file, l.instance)); err != nil {
@@ -289,10 +310,12 @@ func warnCannotRead(path string, err error) {
 	fmt.Fprintf(os.Stderr, "Warning: cannot read config file %s: %s\n", path, errnoText(err))
 }
 
-// checkSectionCase rejects a section that matches a section bound with
-// BindPFlagsWithInstanceFallback only when case is ignored, since viper reads
-// it but the C tools, which match section names exactly, do not.
-func checkSectionCase(raw map[string]any, instance string) error {
+// checkSectionNames rejects a section that v, the viper of the file whose TOML
+// is raw, reads as a section bound with BindPFlagsWithInstanceFallback but the
+// C tools, which look up the whole name exactly, do not: one that matches only
+// when case is ignored, or an unquoted [<section>_a.b], which is table b in
+// table <section>_a.
+func checkSectionNames(raw map[string]any, v *viper.Viper, instance string) error {
 	for _, base := range slices.Sorted(maps.Keys(fallbackSections)) {
 		names := []string{base}
 		if instance != "" {
@@ -304,6 +327,10 @@ func checkSectionCase(raw map[string]any, instance string) error {
 				if key != name && strings.EqualFold(key, name) {
 					return fmt.Errorf("the [%s] config section differs from [%s] only in case", key, name)
 				}
+			}
+
+			if _, ok := raw[name]; !ok && isTable(v, name) {
+				return fmt.Errorf(`the [%s] config section must be quoted as ["%[1]s"]`, name)
 			}
 		}
 	}
@@ -427,11 +454,11 @@ func setFlags(instance string, flags *pflag.FlagSet, files []*viper.Viper) error
 
 		section, key, nested := splitKey(alias)
 		if base, _, _ := splitKey(configToFlagMap[f.Name]); nested && fallbackSections[base] {
-			if strictKeys[section] == nil {
-				strictKeys[section] = map[string]bool{}
+			if strictKeys[base] == nil {
+				strictKeys[base] = map[string]bool{}
 			}
 
-			strictKeys[section][key] = true
+			strictKeys[base][key] = true
 		}
 
 		if setter, ok := f.Value.(configSetter); ok && nested {
@@ -461,8 +488,8 @@ func setFlags(instance string, flags *pflag.FlagSet, files []*viper.Viper) error
 	}
 
 	if files == nil {
-		for section, known := range strictKeys {
-			if err := checkKeys(viper.GetViper(), section, known); err != nil {
+		for base, known := range strictKeys {
+			if err := checkKeys(viper.GetViper(), fallbackSection(viper.GetViper(), base, instance), known); err != nil {
 				return err
 			}
 		}
