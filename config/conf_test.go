@@ -550,7 +550,7 @@ func TestInitConfigFilesUnreadableDefaultFileSkipped(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, []string{home}, files)
 	requireGroupFlags(t, flagSet, "", 2, false)
-	require.Equal(t, "Warning: cannot read config file "+system+": permission denied\n", stderr)
+	require.Equal(t, "Warning: cannot read config file "+system+": Permission denied\n", stderr)
 
 	user := writeConfig(t, filepath.Join(t.TempDir(), "user.conf"), "[group1]\nint = 3\n")
 	require.NoError(t, os.Chmod(user, 0))
@@ -602,6 +602,312 @@ func TestInitConfigFilesUnknownKeysPerFile(t *testing.T) {
 
 	_, err = InitConfigFiles(user, "inst", newGroupFlags(t, "group1", true))
 	require.EqualError(t, err, "config file "+home+": unknown key bogus in the [group1_inst] config section")
+}
+
+func TestInitConfigFilesInstanceSectionMustBeTable(t *testing.T) {
+	// As in asbackup and aql, an instance value that is not a table falls back
+	// to the default section.
+	for name, conf := range map[string]string{
+		"string":          "group1_inst = \"x\"\n\n[group1]\nstr = \"base\"\n",
+		"array of tables": "[group1]\nstr = \"base\"\n\n[[group1_inst]]\nstr = \"array\"\n",
+	} {
+		for loader, load := range loaders {
+			t.Run(name+" "+loader, func(t *testing.T) {
+				setupConfigFiles(t)
+				user := writeConfig(t, filepath.Join(t.TempDir(), "user.conf"), conf)
+				flagSet := newGroupFlags(t, "group1", true)
+
+				require.NoError(t, load(user, "inst", flagSet))
+				requireGroupFlags(t, flagSet, "base", 0, false)
+			})
+		}
+	}
+}
+
+var loaders = map[string]func(file, instance string, flags *pflag.FlagSet) error{
+	"InitConfigFiles": func(file, instance string, flags *pflag.FlagSet) error {
+		_, err := InitConfigFiles(file, instance, flags)
+		return err
+	},
+	"InitConfig": func(file, instance string, flags *pflag.FlagSet) error {
+		_, err := InitConfig(file, instance, flags)
+		return err
+	},
+}
+
+func TestInitConfigFilesSectionNameCase(t *testing.T) {
+	// The C tools match section names exactly, so a section that matches only
+	// when case is ignored is an error rather than read.
+	tests := map[string]struct {
+		conf     string
+		instance string
+		want     string
+	}{
+		"instance section": {
+			conf:     "[group1]\nstr = \"base\"\n\n[group1_INST]\nstr = \"upper\"\n",
+			instance: "inst",
+			want:     "the [group1_INST] config section differs from [group1_inst] only in case",
+		},
+		"default section": {
+			conf: "[GROUP1]\nstr = \"upper\"\n",
+			want: "the [GROUP1] config section differs from [group1] only in case",
+		},
+		"both spellings": {
+			conf:     "[group1_inst]\nstr = \"lower\"\n\n[group1_Inst]\nint = 1\n",
+			instance: "inst",
+			want:     "the [group1_Inst] config section differs from [group1_inst] only in case",
+		},
+	}
+
+	for name, tt := range tests {
+		for loader, load := range loaders {
+			t.Run(name+" "+loader, func(t *testing.T) {
+				setupConfigFiles(t)
+				user := writeConfig(t, filepath.Join(t.TempDir(), "user.conf"), tt.conf)
+
+				want := tt.want
+				if loader == "InitConfigFiles" {
+					want = "config file " + user + ": " + want
+				}
+
+				require.EqualError(t, load(user, tt.instance, newGroupFlags(t, "group1", true)), want)
+			})
+		}
+	}
+
+	setupConfigFiles(t)
+	user := writeConfig(t, filepath.Join(t.TempDir(), "user.conf"),
+		"[group1]\nint = 1\n\n[group1_INST]\nstr = \"upper\"\n")
+	flagSet := newGroupFlags(t, "group1", true)
+
+	_, err := InitConfigFiles(user, "INST", flagSet)
+	require.NoError(t, err)
+	requireGroupFlags(t, flagSet, "upper", 0, false)
+}
+
+func TestInitConfigFilesReadsEveryFileAsTOML(t *testing.T) {
+	for _, name := range []string{"astools", "user.yaml", "user.json"} {
+		t.Run(name, func(t *testing.T) {
+			setupConfigFiles(t)
+			user := writeConfig(t, filepath.Join(t.TempDir(), name), "[group1]\nstr = \"toml\"\n")
+			flagSet := newGroupFlags(t, "group1", false)
+
+			files, err := InitConfigFiles(user, "", flagSet)
+			require.NoError(t, err)
+			require.Equal(t, []string{user}, files)
+			requireGroupFlags(t, flagSet, "toml", 0, false)
+		})
+	}
+}
+
+func TestInitConfigFilesInclude(t *testing.T) {
+	system, home := setupConfigFiles(t)
+	dir := t.TempDir()
+
+	homeInclude := writeConfig(t, filepath.Join(dir, "home-include.conf"), "[group1]\nint = 5\nbool = true\n")
+	userInclude := writeConfig(t, filepath.Join(dir, "user-include.conf"), "[group1]\nint = 2\n")
+
+	writeConfig(t, system, "[group1]\nstr = \"system\"\n")
+	writeConfig(t, home, fmt.Sprintf("[include]\nfile = %q\n\n[group1]\nstr = \"home\"\nint = 4\n", homeInclude))
+	user := writeConfig(t, filepath.Join(dir, "user.conf"),
+		fmt.Sprintf("[group1]\nint = 1\n\n[include]\nfile = %q\n", userInclude))
+
+	flagSet := newGroupFlags(t, "group1", false)
+
+	files, err := InitConfigFiles(user, "", flagSet)
+	require.NoError(t, err)
+	require.Equal(t, []string{system, home, homeInclude, user, userInclude}, files)
+	requireGroupFlags(t, flagSet, "home", 2, true)
+}
+
+func TestInitConfigFilesIncludeDirectory(t *testing.T) {
+	setupConfigFiles(t)
+
+	dir := t.TempDir()
+	include := filepath.Join(dir, "include")
+	require.NoError(t, os.MkdirAll(filepath.Join(include, "sub"), 0o700))
+
+	a := writeConfig(t, filepath.Join(include, "a.conf"), "[group1]\nint = 1\nstr = \"a\"\n")
+	b := writeConfig(t, filepath.Join(include, "b"), "[group1]\nint = 2\n")
+	sub := writeConfig(t, filepath.Join(include, "sub", "c.conf"), "[group1]\nbool = true\n")
+
+	outside := t.TempDir()
+	linked := writeConfig(t, filepath.Join(outside, "linked.conf"), "[group1]\nstr = \"linked\"\n")
+	writeConfig(t, filepath.Join(outside, "skipped.conf"), "[group1]\nint = 9\n")
+	require.NoError(t, os.Symlink(linked, filepath.Join(include, "d.conf")))
+	require.NoError(t, os.Symlink(outside, filepath.Join(include, "e")))
+
+	user := writeConfig(t, filepath.Join(dir, "user.conf"), fmt.Sprintf("[include]\ndirectory = %q\n", include))
+	flagSet := newGroupFlags(t, "group1", false)
+
+	files, err := InitConfigFiles(user, "", flagSet)
+	require.NoError(t, err)
+	require.Equal(t, []string{user, a, b, filepath.Join(include, "d.conf"), sub}, files)
+	requireGroupFlags(t, flagSet, "linked", 2, true)
+}
+
+func TestInitConfigFilesIncludeFileBeforeDirectory(t *testing.T) {
+	setupConfigFiles(t)
+
+	dir := t.TempDir()
+	include := filepath.Join(dir, "include")
+	require.NoError(t, os.Mkdir(include, 0o700))
+
+	file := writeConfig(t, filepath.Join(dir, "file.conf"), "[group1]\nint = 1\nstr = \"file\"\n")
+	inDir := writeConfig(t, filepath.Join(include, "a.conf"), "[group1]\nint = 2\n")
+	user := writeConfig(t, filepath.Join(dir, "user.conf"),
+		fmt.Sprintf("[include]\ndirectory = %q\nfile = %q\n", include, file))
+	flagSet := newGroupFlags(t, "group1", false)
+
+	files, err := InitConfigFiles(user, "", flagSet)
+	require.NoError(t, err)
+	require.Equal(t, []string{user, file, inDir}, files)
+	requireGroupFlags(t, flagSet, "file", 2, false)
+}
+
+func TestInitConfigFilesIncludeDepth(t *testing.T) {
+	setupConfigFiles(t)
+
+	dir := t.TempDir()
+	chain := []string{"user.conf", "1.conf", "2.conf", "3.conf", "4.conf"}
+
+	write := func(n int) {
+		for i := range n {
+			text := fmt.Sprintf("[group1]\nint = %d\n", i)
+			if i+1 < n {
+				text += fmt.Sprintf("\n[include]\nfile = %q\n", filepath.Join(dir, chain[i+1]))
+			}
+
+			writeConfig(t, filepath.Join(dir, chain[i]), text)
+		}
+	}
+
+	write(4)
+
+	flagSet := newGroupFlags(t, "group1", false)
+
+	files, err := InitConfigFiles(filepath.Join(dir, chain[0]), "", flagSet)
+	require.NoError(t, err)
+	require.Len(t, files, 4)
+	requireGroupFlags(t, flagSet, "", 3, false)
+
+	write(5)
+	Reset()
+
+	_, err = InitConfigFiles(filepath.Join(dir, chain[0]), "", newGroupFlags(t, "group1", false))
+	require.EqualError(t, err, "config file "+filepath.Join(dir, "4.conf")+": [include] is nested more than 3 levels deep")
+}
+
+func TestInitConfigFilesIncludeErrors(t *testing.T) {
+	dir := t.TempDir()
+	notTOML := writeConfig(t, filepath.Join(dir, "not-toml"), "[group1\n")
+	badDir := filepath.Join(dir, "bad-dir")
+	require.NoError(t, os.Mkdir(badDir, 0o700))
+	writeConfig(t, filepath.Join(badDir, "a.conf"), "[group1\n")
+
+	tests := map[string]struct {
+		include string
+		want    string
+	}{
+		"unknown key": {
+			include: "files = \"x\"\n",
+			want:    "unknown key files in the [include] config section",
+		},
+		"not a string": {
+			include: "file = 1\n",
+			want:    "invalid value 1 for file in the [include] config section, expected a path",
+		},
+		"missing directory": {
+			include: fmt.Sprintf("directory = %q\n", filepath.Join(dir, "missing")),
+			want:    "cannot read config directory " + filepath.Join(dir, "missing") + ": No such file or directory",
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			setupConfigFiles(t)
+			user := writeConfig(t, filepath.Join(t.TempDir(), "user.conf"), "[include]\n"+tt.include)
+
+			_, err := InitConfigFiles(user, "", newGroupFlags(t, "group1", false))
+			require.EqualError(t, err, "config file "+user+": "+tt.want)
+		})
+	}
+
+	for name, include := range map[string]string{"file": notTOML, "directory": badDir} {
+		t.Run("parse error in an included "+name, func(t *testing.T) {
+			setupConfigFiles(t)
+			user := writeConfig(t, filepath.Join(t.TempDir(), "user.conf"),
+				fmt.Sprintf("[include]\n%s = %q\n", name, include))
+
+			_, err := InitConfigFiles(user, "", newGroupFlags(t, "group1", false))
+			require.ErrorContains(t, err, "failed to read config file ")
+		})
+	}
+
+	t.Run("missing file is skipped", func(t *testing.T) {
+		setupConfigFiles(t)
+		user := writeConfig(t, filepath.Join(t.TempDir(), "user.conf"),
+			fmt.Sprintf("[group1]\nint = 1\n\n[include]\nfile = %q\n", filepath.Join(dir, "missing.conf")))
+		flagSet := newGroupFlags(t, "group1", false)
+
+		files, err := InitConfigFiles(user, "", flagSet)
+		require.NoError(t, err)
+		require.Equal(t, []string{user}, files)
+		requireGroupFlags(t, flagSet, "", 1, false)
+	})
+
+	t.Run("unreadable file is skipped with a warning", func(t *testing.T) {
+		if os.Geteuid() == 0 {
+			t.Skip("root can read any file")
+		}
+
+		setupConfigFiles(t)
+		unreadable := writeConfig(t, filepath.Join(t.TempDir(), "unreadable.conf"), "[group1]\nint = 2\n")
+		require.NoError(t, os.Chmod(unreadable, 0))
+		user := writeConfig(t, filepath.Join(t.TempDir(), "user.conf"),
+			fmt.Sprintf("[group1]\nint = 1\n\n[include]\nfile = %q\n", unreadable))
+		flagSet := newGroupFlags(t, "group1", false)
+
+		var (
+			files []string
+			err   error
+		)
+
+		stderr := captureStderr(t, func() { files, err = InitConfigFiles(user, "", flagSet) })
+		require.NoError(t, err)
+		require.Equal(t, []string{user}, files)
+		requireGroupFlags(t, flagSet, "", 1, false)
+		require.Equal(t, "Warning: cannot read config file "+unreadable+": Permission denied\n", stderr)
+	})
+}
+
+func TestInitConfigFilesIncludeSelectsSectionsPerFile(t *testing.T) {
+	setupConfigFiles(t)
+
+	dir := t.TempDir()
+	include := writeConfig(t, filepath.Join(dir, "include.conf"),
+		"[group1]\nint = 2\n\n[group1_other]\nint = 9\n")
+	user := writeConfig(t, filepath.Join(dir, "user.conf"),
+		fmt.Sprintf("[group1_inst]\nstr = \"inst\"\n\n[include]\nfile = %q\n", include))
+	flagSet := newGroupFlags(t, "group1", true)
+
+	_, err := InitConfigFiles(user, "inst", flagSet)
+	require.NoError(t, err)
+	requireGroupFlags(t, flagSet, "inst", 2, false)
+}
+
+func TestInitConfigIgnoresInclude(t *testing.T) {
+	setupConfigFiles(t)
+
+	dir := t.TempDir()
+	include := writeConfig(t, filepath.Join(dir, "include.conf"), "[group1]\nint = 2\n")
+	user := writeConfig(t, filepath.Join(dir, "user.conf"),
+		fmt.Sprintf("[group1]\nint = 1\n\n[include]\nfile = %q\ndirectory = \"/missing\"\n", include))
+	flagSet := newGroupFlags(t, "group1", false)
+
+	_, err := InitConfig(user, "", flagSet)
+	require.NoError(t, err)
+	requireGroupFlags(t, flagSet, "", 1, false)
 }
 
 func TestInitConfigDefaultPathUnchanged(t *testing.T) {

@@ -9,6 +9,7 @@ import (
 	"regexp"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/require"
@@ -203,25 +204,38 @@ func TestSecretAgentCAFileCSpellingDeprecated(t *testing.T) {
 	pki, err := secretagenttest.GeneratePKI(t.TempDir())
 	require.NoError(t, err)
 
-	var fs *pflag.FlagSet
+	const deprecated = "Argument --sa-cafile is deprecated. Use --sa-ca-file instead."
+
+	var warnings *[]string
 
 	out := captureStderr(t, func() {
-		sa := NewDefaultSecretAgentFlags()
-		fs = sa.NewFlagSet(DefaultWrapHelpString)
+		af, sa := parseToolFlags(t, "--sa-cafile", pki.CAFile, "-P", "env:TCG_TEST_UNSET")
+		warnings = collectWarnings(af)
 
-		require.NoError(t, fs.Parse([]string{"--sa-cafile", pki.CAFile}))
-		require.NoError(t, sa.Validate())
+		require.NoError(t, af.ResolveSecrets(t.Context(), sa))
+		require.NoError(t, af.ResolveSecrets(t.Context(), sa))
 
 		_, clientErr := sa.NewClient()
 		require.NoError(t, clientErr)
 	})
 
-	require.Equal(t, "Warning: Argument --sa-cafile is deprecated. Use --sa-ca-file instead.\n", out)
+	require.Empty(t, out)
+	require.Equal(t, []string{deprecated, "--password: ignored because no user is set"}, *warnings)
+
+	out = captureStderr(t, func() {
+		af, sa := parseToolFlags(t, "--sa-cafile", pki.CAFile)
+		require.NoError(t, af.ResolveSecrets(t.Context(), sa))
+	})
+
+	require.Equal(t, "Warning: "+deprecated+"\n", out)
+
+	fs := NewDefaultSecretAgentFlags().NewFlagSet(DefaultWrapHelpString)
 	require.True(t, fs.Lookup("sa-cafile").Hidden)
 	require.NotContains(t, fs.FlagUsages(), "sa-cafile")
 
 	out = captureStderr(t, func() {
-		_, sa := parseToolConfig(t, fmt.Sprintf("[secret-agent]\nsa-cafile = %q\n", pki.CAFile))
+		af, sa := parseToolConfig(t, fmt.Sprintf("[secret-agent]\nsa-cafile = %q\n", pki.CAFile))
+		require.NoError(t, af.ResolveSecrets(t.Context(), sa))
 
 		_, clientErr := sa.NewClient()
 		require.NoError(t, clientErr)
@@ -275,7 +289,10 @@ func TestSecretAgentNewClientInvalid(t *testing.T) {
 	}{
 		"address": {args: []string{"--sa-address", "host:"}, want: `--sa-address: invalid value "host:"`},
 		"timeout": {args: []string{"--sa-timeout", "0"}, want: `--sa-timeout: invalid value "0"`},
-		"CA file": {args: []string{"--sa-ca-file", "/missing.pem"}, want: `--sa-ca-file: cannot load CA file "/missing.pem": no such file or directory`},
+		"CA file": {
+			args: []string{"--sa-ca-file", "/missing.pem"},
+			want: `--sa-ca-file: cannot load CA file "/missing.pem": No such file or directory`,
+		},
 	}
 
 	for name, tt := range tests {
@@ -301,6 +318,57 @@ func TestSecretAgentFlagsWithoutFlagSet(t *testing.T) {
 	client, err := sa.NewClient()
 	require.NoError(t, err)
 	require.NotNil(t, client)
+}
+
+func TestSecretAgentZeroValueUsesDefaults(t *testing.T) {
+	t.Parallel()
+
+	sa := &SecretAgentFlags{}
+	require.NoError(t, sa.Validate())
+
+	cfg, err := sa.config()
+	require.NoError(t, err)
+	require.Equal(t, "127.0.0.1:3005", cfg.Address)
+	require.Equal(t, time.Second, cfg.Timeout)
+
+	err = (&SecretAgentFlags{Timeout: -1}).Validate()
+	require.EqualError(t, err, `--sa-timeout: invalid value "-1", expected an integer from 1 to 2147483647`)
+}
+
+func TestResolveSecretsNilSecretAgentFlags(t *testing.T) {
+	t.Parallel()
+
+	af, _ := parseToolFlags(t, "-U", "admin", "-P", "admin")
+
+	var err error
+
+	require.NotPanics(t, func() { err = af.ResolveSecrets(t.Context(), nil) })
+	require.NoError(t, err)
+	require.Equal(t, "admin", string(af.Password))
+}
+
+func TestSecretAgentCAFileErrorText(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	missing := filepath.Join(dir, "missing.pem")
+
+	paths := map[string]string{missing: "No such file or directory", dir: "Is a directory"}
+
+	if os.Geteuid() != 0 {
+		unreadable := filepath.Join(dir, "unreadable.pem")
+		require.NoError(t, os.WriteFile(unreadable, []byte("x"), 0))
+		paths[unreadable] = "Permission denied"
+	}
+
+	for path, want := range paths {
+		t.Run(want, func(t *testing.T) {
+			t.Parallel()
+
+			_, err := parseSecretAgentFlags(t, []string{"--sa-ca-file", path}, nil).NewClient()
+			require.EqualError(t, err, `--sa-ca-file: cannot load CA file "`+path+`": `+want)
+		})
+	}
 }
 
 func TestSecretAgentFlagSet(t *testing.T) {
@@ -667,6 +735,7 @@ func TestSecretAgentFlagUsage(t *testing.T) {
 	}
 
 	require.NotContains(t, fs.FlagUsages(), "sa-cafile")
+	require.Regexp(t, `--sa-port port\s`, fs.FlagUsages())
 }
 
 func TestSecretAgentCAFileBeatsCSpelling(t *testing.T) {
@@ -812,28 +881,34 @@ func TestSecretAgentCAFileReadOnlyWhenFetching(t *testing.T) {
 		})
 	}
 
+	const (
+		load            = `: cannot load CA file "`
+		notFound        = `": No such file or directory`
+		noCerts         = `": no certificates found`
+		section         = " in the [secret-agent] config section"
+		instanceSection = " in the [secret-agent_x] config section"
+	)
+
 	tests := map[string]struct {
 		conf     string
 		instance string
 		want     string
 		args     []string
 	}{
-		"--sa-ca-file": {
-			args: []string{"--sa-ca-file", missing}, want: `--sa-ca-file: cannot load CA file "` + missing + `": no such file or directory`,
-		},
-		"--sa-cafile": {args: []string{"--sa-cafile", notPEM}, want: `--sa-cafile: cannot load CA file "` + notPEM + `": no certificates found`},
+		"--sa-ca-file": {args: []string{"--sa-ca-file", missing}, want: "--sa-ca-file" + load + missing + notFound},
+		"--sa-cafile":  {args: []string{"--sa-cafile", notPEM}, want: "--sa-cafile" + load + notPEM + noCerts},
 		"sa-ca-file": {
 			conf: fmt.Sprintf("[secret-agent]\nsa-ca-file = %q\n", missing),
-			want: `sa-ca-file in the [secret-agent] config section: cannot load CA file "` + missing + `": no such file or directory`,
+			want: "sa-ca-file" + section + load + missing + notFound,
 		},
 		"sa-cafile": {
 			conf: fmt.Sprintf("[secret-agent]\nsa-cafile = %q\n", notPEM),
-			want: `sa-cafile in the [secret-agent] config section: cannot load CA file "` + notPEM + `": no certificates found`,
+			want: "sa-cafile" + section + load + notPEM + noCerts,
 		},
 		"instance sa-ca-file": {
 			conf:     fmt.Sprintf("[secret-agent]\nsa-ca-file = %q\n\n[secret-agent_x]\nsa-ca-file = %q\n", notPEM, missing),
 			instance: "x",
-			want:     `sa-ca-file in the [secret-agent_x] config section: cannot load CA file "` + missing + `": no such file or directory`,
+			want:     "sa-ca-file" + instanceSection + load + missing + notFound,
 		},
 	}
 
@@ -900,10 +975,10 @@ func TestSecretAgentConfigKeysIgnoreCase(t *testing.T) {
 	require.ErrorContains(t, err, " in the [secret-agent] config section, expected an integer from 1 to 65535")
 }
 
-func resolveToolConfigFiles(t *testing.T, home, user, instance string, args ...string) (*AerospikeFlags, error) {
+func resolveToolConfigFiles(t *testing.T, home, user, instance string) (*AerospikeFlags, error) {
 	t.Helper()
 
-	af, sa, err := loadToolConfigFiles(t, home, user, instance, args...)
+	af, sa, err := loadToolConfigFiles(t, home, user, instance)
 	if err == nil {
 		err = af.ResolveSecrets(t.Context(), sa)
 	}
@@ -990,13 +1065,15 @@ func TestSecretAgentConfigFilesCAFile(t *testing.T) {
 			home:     fmt.Sprintf("[secret-agent_x]\nsa-address = \"127.0.0.1:1\"\nsa-ca-file = %q\n", missing),
 			user:     fmt.Sprintf("[secret-agent]\nsa-address = %q\n", agent.Addr()),
 			instance: "x",
-			want:     `sa-ca-file in the [secret-agent_x] config section: cannot load CA file "` + missing + `": no such file or directory`,
+			want: `sa-ca-file in the [secret-agent_x] config section: cannot load CA file "` + missing +
+				`": No such file or directory`,
 		},
 		"later instance section names the CA file": {
 			home:     fmt.Sprintf("[secret-agent]\nsa-address = %q\nsa-ca-file = %q\n", agent.Addr(), agent.CAFile()),
 			user:     fmt.Sprintf("[secret-agent_x]\nsa-cafile = %q\n", missing),
 			instance: "x",
-			want:     `sa-cafile in the [secret-agent_x] config section: cannot load CA file "` + missing + `": no such file or directory`,
+			want: `sa-cafile in the [secret-agent_x] config section: cannot load CA file "` + missing +
+				`": No such file or directory`,
 		},
 	}
 
@@ -1082,6 +1159,79 @@ func TestSecretAgentInstanceSectionsMergePerFile(t *testing.T) {
 	address, err := sa.address()
 	require.NoError(t, err)
 	require.Equal(t, "agent:5000", address)
+}
+
+func TestSecretAgentInstanceValueNotATable(t *testing.T) {
+	agent := secretagenttest.NewTLSServer(t, secretagenttest.Secrets{"aql": {"user": encode(resolvedUser)}})
+	base := fmt.Sprintf("[cluster_prod]\nuser = \"secrets:aql:user\"\n\n[secret-agent]\nsa-address = %q\n"+
+		"sa-ca-file = %q\n", agent.Addr(), agent.CAFile())
+
+	for name, conf := range map[string]string{
+		"string":          "secret-agent_prod = \"x\"\n" + base,
+		"array of tables": base + "\n[[secret-agent_prod]]\nsa-address = \"127.0.0.1:1\"\n",
+	} {
+		t.Run(name+" InitConfig", func(t *testing.T) {
+			af, sa, err := loadToolConfig(t, conf, "prod")
+			require.NoError(t, err)
+			require.NoError(t, af.ResolveSecrets(t.Context(), sa))
+			require.Equal(t, resolvedUser, af.User)
+		})
+
+		t.Run(name+" InitConfigFiles", func(t *testing.T) {
+			af, err := resolveToolConfigFiles(t, "", conf, "prod")
+			require.NoError(t, err)
+			require.Equal(t, resolvedUser, af.User)
+		})
+	}
+}
+
+func TestSecretAgentCAFileInIncludedFile(t *testing.T) {
+	agent := secretagenttest.NewTLSServer(t, secretagenttest.Secrets{"aql": {"user": encode(resolvedUser)}})
+
+	dir := t.TempDir()
+	include := filepath.Join(dir, "include.conf")
+	require.NoError(t, os.WriteFile(include, fmt.Appendf(nil, "[secret-agent]\nsa-ca-file = %q\n", agent.CAFile()), 0o600))
+
+	user := fmt.Sprintf("[cluster]\nuser = \"secrets:aql:user\"\n\n[secret-agent]\nsa-address = %q\n\n[include]\n",
+		agent.Addr())
+
+	for name, entry := range map[string]string{
+		"file":      fmt.Sprintf("file = %q\n", include),
+		"directory": fmt.Sprintf("directory = %q\n", dir),
+	} {
+		t.Run(name, func(t *testing.T) {
+			af, err := resolveToolConfigFiles(t, "", user+entry, "")
+			require.NoError(t, err)
+			require.Equal(t, resolvedUser, af.User)
+		})
+	}
+}
+
+func TestSecretAgentInstanceSectionCase(t *testing.T) {
+	const (
+		conf = "[secret-agent]\nsa-ca-file = \"/ca.pem\"\n\n[secret-agent_PROD]\nsa-address = \"127.0.0.1:1\"\n"
+		want = "the [secret-agent_PROD] config section differs from [secret-agent_prod] only in case"
+	)
+
+	t.Run("InitConfigFiles", func(t *testing.T) {
+		_, _, err := loadToolConfigFiles(t, "", conf, "prod")
+		require.Error(t, err)
+		require.Regexp(t, `^config file \S*/user.conf: `+regexp.QuoteMeta(want)+`$`, err.Error())
+	})
+
+	t.Run("InitConfig", func(t *testing.T) {
+		_, _, err := loadToolConfig(t, conf, "prod")
+		require.EqualError(t, err, want)
+	})
+
+	t.Run("exact case", func(t *testing.T) {
+		_, sa, err := loadToolConfigFiles(t, "", conf, "PROD")
+		require.NoError(t, err)
+
+		address, err := sa.address()
+		require.NoError(t, err)
+		require.Equal(t, "127.0.0.1:1", address)
+	})
 }
 
 func TestSecretAgentEmptyTimeout(t *testing.T) {

@@ -637,6 +637,43 @@ func e2eToolConfig(
 	return af, sa
 }
 
+// e2eToolConfigFiles is e2eToolConfig with config.InitConfigFiles and conf as
+// the --config-file. A config name of its own keeps the files in /etc/aerospike
+// and the user's $HOME out.
+func e2eToolConfigFiles(
+	t *testing.T, conf, instance string, args ...string,
+) (*flags.AerospikeFlags, *flags.SecretAgentFlags) {
+	t.Helper()
+
+	t.Setenv("HOME", t.TempDir())
+
+	config.SetDefaultConfName("astools-e2e-test")
+	t.Cleanup(func() { config.SetDefaultConfName(config.DefaultConfName) })
+
+	file := filepath.Join(t.TempDir(), "astools.conf")
+	require.NoError(t, os.WriteFile(file, []byte(conf), 0o600))
+
+	config.Reset()
+	t.Cleanup(config.Reset)
+
+	af := flags.NewDefaultAerospikeFlags()
+	sa := flags.NewDefaultSecretAgentFlags()
+
+	fs := af.NewFlagSetWithSecrets(flags.DefaultWrapHelpString)
+	config.BindPFlags(fs, "cluster")
+
+	saFlags := sa.NewFlagSet(flags.DefaultWrapHelpString)
+	config.BindPFlagsWithInstanceFallback(saFlags, "secret-agent")
+	fs.AddFlagSet(saFlags)
+
+	require.NoError(t, fs.Parse(args))
+
+	_, err := config.InitConfigFiles(file, instance, fs)
+	require.NoError(t, err)
+
+	return af, sa
+}
+
 func TestE2EFlagsAndConfigFile(t *testing.T) {
 	untrusted, err := secretagenttest.GeneratePKI(t.TempDir())
 	require.NoError(t, err)
@@ -700,6 +737,39 @@ func TestE2EFlagsAndConfigFile(t *testing.T) {
 			require.Equal(t, testSecret, string(af.Password))
 		})
 	}
+
+	t.Run("instance value that is not a table", func(t *testing.T) {
+		base := fmt.Sprintf("[cluster_e2e]\n%s[secret-agent]\nsa-address = %q\nsa-ca-file = %q\n", cluster,
+			e2e.tlsAddr, ca)
+
+		for _, conf := range []string{
+			"secret-agent_e2e = \"x\"\n" + base,
+			base + "\n[[secret-agent_e2e]]\nsa-address = \"127.0.0.1:1\"\n",
+		} {
+			af, sa := e2eToolConfig(t, conf, "e2e")
+			require.NoError(t, af.ResolveSecrets(t.Context(), sa))
+
+			af, sa = e2eToolConfigFiles(t, conf, "e2e")
+			require.NoError(t, af.ResolveSecrets(t.Context(), sa))
+			require.Equal(t, otherValue, af.User)
+			require.Equal(t, testSecret, string(af.Password))
+		}
+	})
+
+	t.Run("CA file in an included file", func(t *testing.T) {
+		dir := t.TempDir()
+		include := filepath.Join(dir, "include.conf")
+		require.NoError(t, os.WriteFile(include, fmt.Appendf(nil, "[secret-agent]\nsa-ca-file = %q\n", ca), 0o600))
+
+		conf := fmt.Sprintf("[cluster]\n%s[secret-agent]\nsa-address = %q\n\n[include]\n", cluster, e2e.tlsAddr)
+
+		for _, entry := range []string{fmt.Sprintf("file = %q\n", include), fmt.Sprintf("directory = %q\n", dir)} {
+			af, sa := e2eToolConfigFiles(t, conf+entry, "")
+			require.NoError(t, af.ResolveSecrets(t.Context(), sa), entry)
+			require.Equal(t, otherValue, af.User)
+			require.Equal(t, testSecret, string(af.Password))
+		}
+	})
 
 	t.Run("crafted reference", func(t *testing.T) {
 		af, sa := e2eToolConfig(t, fmt.Sprintf("[cluster]\nuser = %q\n\n[secret-agent]\nsa-address = %q\nsa-ca-file = %q\n",
