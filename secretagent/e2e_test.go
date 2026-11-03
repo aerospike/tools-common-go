@@ -722,13 +722,26 @@ func e2eToolConfigFiles(
 ) (*flags.AerospikeFlags, *flags.SecretAgentFlags) {
 	t.Helper()
 
+	file := filepath.Join(t.TempDir(), "astools.conf")
+	require.NoError(t, os.WriteFile(file, []byte(conf), 0o600))
+
+	af, sa, err := e2eLoadConfigFiles(t, config.Files{File: file}, instance, args...)
+	require.NoError(t, err)
+
+	return af, sa
+}
+
+// e2eLoadConfigFiles loads the config files that files selects as a tool does,
+// with no default file.
+func e2eLoadConfigFiles(
+	t *testing.T, files config.Files, instance string, args ...string,
+) (*flags.AerospikeFlags, *flags.SecretAgentFlags, error) {
+	t.Helper()
+
 	t.Setenv("HOME", t.TempDir())
 
 	config.SetDefaultConfName("astools-e2e-test")
 	t.Cleanup(func() { config.SetDefaultConfName(config.DefaultConfName) })
-
-	file := filepath.Join(t.TempDir(), "astools.conf")
-	require.NoError(t, os.WriteFile(file, []byte(conf), 0o600))
 
 	config.Reset()
 	t.Cleanup(config.Reset)
@@ -745,10 +758,9 @@ func e2eToolConfigFiles(
 
 	require.NoError(t, fs.Parse(args))
 
-	_, err := config.InitConfigFiles(config.Files{File: file}, instance, fs)
-	require.NoError(t, err)
+	_, err := config.InitConfigFiles(files, instance, fs)
 
-	return af, sa
+	return af, sa, err
 }
 
 func TestE2EFlagsAndConfigFile(t *testing.T) {
@@ -873,6 +885,55 @@ func TestE2EFlagsAndConfigFile(t *testing.T) {
 			require.Equal(t, otherValue, af.User)
 			require.Equal(t, testSecret, string(af.Password))
 		}
+	})
+
+	t.Run("only config file keeps the CA file", func(t *testing.T) {
+		include := filepath.Join(t.TempDir(), "include.conf")
+		require.NoError(t, os.WriteFile(include, fmt.Appendf(nil, "[secret-agent]\nsa-ca-file = %q\n", ca), 0o600))
+
+		withInclude := fmt.Sprintf("[cluster]\n%s[secret-agent]\nsa-address = %q\n\n[include]\n", cluster, e2e.tlsAddr)
+
+		for name, tt := range map[string]struct{ conf, instance string }{
+			"included file":      {conf: withInclude + fmt.Sprintf("file = %q\n", include)},
+			"included directory": {conf: withInclude + fmt.Sprintf("directory = %q\n", filepath.Dir(include))},
+			"instance section": {
+				conf: fmt.Sprintf("[cluster_e2e]\n%s[secret-agent]\nsa-address = %q\n\n[secret-agent_e2e]\n"+
+					"sa-address = %q\nsa-ca-file = %q\n", cluster, unreachableAddr, e2e.tlsAddr, ca),
+				instance: "e2e",
+			},
+			"instance falls back to [secret-agent]": {
+				conf: fmt.Sprintf("[cluster_e2e]\n%s[secret-agent]\nsa-address = %q\nsa-ca-file = %q\n", cluster,
+					e2e.tlsAddr, ca),
+				instance: "e2e",
+			},
+		} {
+			only := filepath.Join(t.TempDir(), "only.conf")
+			require.NoError(t, os.WriteFile(only, []byte(tt.conf), 0o600))
+
+			af, sa, err := e2eLoadConfigFiles(t, config.Files{Only: only}, tt.instance)
+			require.NoError(t, err, name)
+			require.NoError(t, af.ResolveSecrets(t.Context(), sa), name)
+			require.Equal(t, otherValue, af.User, name)
+			require.Equal(t, testSecret, string(af.Password), name)
+		}
+	})
+
+	t.Run("config file with only or no config file", func(t *testing.T) {
+		dir := t.TempDir()
+
+		base := filepath.Join(dir, "base.conf")
+		require.NoError(t, os.WriteFile(base,
+			fmt.Appendf(nil, "[cluster]\n%s[secret-agent]\nsa-address = %q\n", cluster, e2e.tlsAddr), 0o600))
+
+		secure := filepath.Join(dir, "secure.conf")
+		require.NoError(t, os.WriteFile(secure, fmt.Appendf(nil, "[secret-agent]\nsa-ca-file = %q\n", ca), 0o600))
+
+		_, _, err := e2eLoadConfigFiles(t, config.Files{Only: base, File: secure}, "")
+		require.EqualError(t, err, "--config-file and --only-config-file are mutually exclusive")
+
+		_, _, err = e2eLoadConfigFiles(t, config.Files{None: true, File: secure}, "",
+			"-U", "secrets:other:password", "-P", "secrets:aql:password", "--sa-address", e2e.tlsAddr)
+		require.EqualError(t, err, "--config-file and --no-config-file are mutually exclusive")
 	})
 
 	t.Run("crafted reference", func(t *testing.T) {

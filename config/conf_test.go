@@ -534,14 +534,27 @@ func TestInitConfigFilesOnlyFile(t *testing.T) {
 	dir := t.TempDir()
 	included := writeConfig(t, filepath.Join(dir, "included.conf"), "[group1]\nbool = true\n")
 	only := writeConfig(t, filepath.Join(dir, "only.conf"), "[include]\nfile = \""+included+"\"\n\n[group1]\nint = 3\n")
-	user := writeConfig(t, filepath.Join(dir, "user.conf"), "[group1]\nstr = \"user\"\n")
 
 	flagSet := newGroupFlags(t, "group1", false)
 
-	files, err := InitConfigFiles(Files{File: user, Only: only}, "", flagSet)
+	files, err := InitConfigFiles(Files{Only: only}, "", flagSet)
 	require.NoError(t, err)
 	require.Equal(t, []string{only, included}, files)
 	requireGroupFlags(t, flagSet, "", 3, true)
+}
+
+func TestInitConfigFilesOnlyFileWithFile(t *testing.T) {
+	setupConfigFiles(t)
+
+	dir := t.TempDir()
+	only := writeConfig(t, filepath.Join(dir, "only.conf"), "[group1]\nint = 3\n")
+	user := writeConfig(t, filepath.Join(dir, "user.conf"), "[group1]\nstr = \"user\"\n")
+	flagSet := newGroupFlags(t, "group1", false)
+
+	files, err := InitConfigFiles(Files{File: user, Only: only}, "", flagSet)
+	require.EqualError(t, err, "--config-file and --only-config-file are mutually exclusive")
+	require.Empty(t, files)
+	requireGroupFlags(t, flagSet, "", 0, false)
 }
 
 func TestInitConfigFilesOnlyFileMissing(t *testing.T) {
@@ -557,14 +570,25 @@ func TestInitConfigFilesNoFile(t *testing.T) {
 	system, home := setupConfigFiles(t)
 	writeConfig(t, system, "[group1\n")
 	writeConfig(t, home, "[group1\n")
-	user := writeConfig(t, filepath.Join(t.TempDir(), "user.conf"), "[group1\n")
 
 	flagSet := newGroupFlags(t, "group1", false, "--int=4")
 
-	files, err := InitConfigFiles(Files{File: user, None: true}, "", flagSet)
+	files, err := InitConfigFiles(Files{None: true}, "", flagSet)
 	require.NoError(t, err)
 	require.Empty(t, files)
 	requireGroupFlags(t, flagSet, "", 4, false)
+}
+
+func TestInitConfigFilesNoFileWithFile(t *testing.T) {
+	setupConfigFiles(t)
+
+	user := writeConfig(t, filepath.Join(t.TempDir(), "user.conf"), "[group1]\nint = 3\n")
+	flagSet := newGroupFlags(t, "group1", false)
+
+	files, err := InitConfigFiles(Files{File: user, None: true}, "", flagSet)
+	require.EqualError(t, err, "--config-file and --no-config-file are mutually exclusive")
+	require.Empty(t, files)
+	requireGroupFlags(t, flagSet, "", 0, false)
 }
 
 func TestInitConfigFilesNoFileWithOnlyFile(t *testing.T) {

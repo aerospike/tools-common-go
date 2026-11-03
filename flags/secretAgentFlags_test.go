@@ -14,6 +14,7 @@ import (
 	"github.com/spf13/pflag"
 	"github.com/stretchr/testify/require"
 
+	"github.com/aerospike/tools-common-go/config"
 	"github.com/aerospike/tools-common-go/secretagent"
 	"github.com/aerospike/tools-common-go/secretagent/secretagenttest"
 )
@@ -988,6 +989,19 @@ func resolveToolConfigFiles(t *testing.T, home, user, instance string) (*Aerospi
 	return af, err
 }
 
+func resolveToolConfigFileSet(t *testing.T, home string, files config.Files, instance string, args ...string) (
+	*AerospikeFlags, error,
+) {
+	t.Helper()
+
+	af, sa, err := loadToolConfigFileSet(t, home, files, instance, args...)
+	if err == nil {
+		err = af.ResolveSecrets(t.Context(), sa)
+	}
+
+	return af, err
+}
+
 func TestSecretAgentConfigFilesMergeKeyByKey(t *testing.T) {
 	agent := secretagenttest.NewTLSServer(t, secretagenttest.Secrets{"aql": {"user": encode(resolvedUser)}})
 
@@ -1207,6 +1221,90 @@ func TestSecretAgentCAFileInIncludedFile(t *testing.T) {
 			require.Equal(t, resolvedUser, af.User)
 		})
 	}
+}
+
+func TestSecretAgentOnlyConfigFileCAFile(t *testing.T) {
+	agent := secretagenttest.NewTLSServer(t, secretagenttest.Secrets{"aql": {"user": encode(resolvedUser)}})
+	missing := filepath.Join(t.TempDir(), "missing.pem")
+
+	include := writeToolConfig(t, "include.conf", fmt.Sprintf("[secret-agent]\nsa-ca-file = %q\n", agent.CAFile()))
+	withInclude := fmt.Sprintf("[cluster]\nuser = \"secrets:aql:user\"\n\n[secret-agent]\nsa-address = %q\n\n[include]\n",
+		agent.Addr())
+
+	tests := map[string]struct {
+		conf     string
+		instance string
+	}{
+		"included file":      {conf: withInclude + fmt.Sprintf("file = %q\n", include)},
+		"included directory": {conf: withInclude + fmt.Sprintf("directory = %q\n", filepath.Dir(include))},
+		"instance section": {
+			conf: fmt.Sprintf("[cluster_a]\nuser = \"secrets:aql:user\"\n\n[secret-agent]\nsa-address = \"127.0.0.1:1\"\n"+
+				"sa-ca-file = %q\n\n[secret-agent_a]\nsa-address = %q\nsa-ca-file = %q\n", missing, agent.Addr(), agent.CAFile()),
+			instance: "a",
+		},
+		"instance falls back to [secret-agent]": {
+			conf: fmt.Sprintf("[cluster_a]\nuser = \"secrets:aql:user\"\n\n[secret-agent]\nsa-address = %q\n"+
+				"sa-ca-file = %q\n", agent.Addr(), agent.CAFile()),
+			instance: "a",
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			only := writeToolConfig(t, "only.conf", tt.conf)
+
+			af, err := resolveToolConfigFileSet(t, "[secret-agent]\nbogus = 1\n", config.Files{Only: only}, tt.instance)
+			require.NoError(t, err)
+			require.Equal(t, resolvedUser, af.User)
+		})
+	}
+}
+
+func TestSecretAgentConfigFileWithOnlyOrNoConfigFile(t *testing.T) {
+	agent := secretagenttest.NewTLSServer(t, secretagenttest.Secrets{"aql": {"user": encode(resolvedUser)}})
+
+	base := writeToolConfig(t, "base.conf",
+		fmt.Sprintf("[cluster]\nuser = \"secrets:aql:user\"\n\n[secret-agent]\nsa-address = %q\n", agent.Addr()))
+	secure := writeToolConfig(t, "secure.conf", fmt.Sprintf("[secret-agent]\nsa-ca-file = %q\n", agent.CAFile()))
+
+	tests := map[string]struct {
+		files config.Files
+		args  []string
+		want  string
+	}{
+		"--only-config-file": {
+			files: config.Files{Only: base, File: secure},
+			want:  "--config-file and --only-config-file are mutually exclusive",
+		},
+		"--no-config-file": {
+			files: config.Files{None: true, File: secure},
+			args:  []string{"-U", "secrets:aql:user", "--sa-address", agent.Addr()},
+			want:  "--config-file and --no-config-file are mutually exclusive",
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			_, err := resolveToolConfigFileSet(t, "", tt.files, "", tt.args...)
+			require.EqualError(t, err, tt.want)
+		})
+	}
+}
+
+func TestSecretAgentNoConfigFileIgnoresHomeCAFile(t *testing.T) {
+	const home = "[secret-agent]\nsa-address = \"agent:5000\"\nsa-ca-file = \"/home-ca.pem\"\n"
+
+	_, sa, err := loadToolConfigFileSet(t, home, config.Files{}, "")
+	require.NoError(t, err)
+	require.Equal(t, "/home-ca.pem", sa.caFile())
+
+	_, sa, err = loadToolConfigFileSet(t, home, config.Files{None: true}, "")
+	require.NoError(t, err)
+	require.Empty(t, sa.caFile())
+
+	address, err := sa.address()
+	require.NoError(t, err)
+	require.Equal(t, "127.0.0.1:3005", address)
 }
 
 func TestSecretAgentDottedInstance(t *testing.T) {

@@ -182,6 +182,30 @@ func loadToolConfigFiles(t *testing.T, home, user, instance string, args ...stri
 ) {
 	t.Helper()
 
+	userFile := ""
+	if user != "" {
+		userFile = writeToolConfig(t, "user.conf", user)
+	}
+
+	return loadToolConfigFileSet(t, home, config.Files{File: userFile}, instance, args...)
+}
+
+func writeToolConfig(t *testing.T, name, conf string) string {
+	t.Helper()
+
+	path := filepath.Join(t.TempDir(), name)
+	require.NoError(t, os.WriteFile(path, []byte(conf), 0o600))
+
+	return path
+}
+
+// loadToolConfigFileSet is loadToolConfigFiles with the files read given as a
+// config.Files.
+func loadToolConfigFileSet(t *testing.T, home string, files config.Files, instance string, args ...string) (
+	*AerospikeFlags, *SecretAgentFlags, error,
+) {
+	t.Helper()
+
 	homeDir := t.TempDir()
 	t.Setenv("HOME", homeDir)
 
@@ -192,12 +216,6 @@ func loadToolConfigFiles(t *testing.T, home, user, instance string, args ...stri
 		require.NoError(t, os.Mkdir(filepath.Join(homeDir, ".aerospike"), 0o700))
 		require.NoError(t, os.WriteFile(filepath.Join(homeDir, ".aerospike", "astools-flags-test.conf"),
 			[]byte(home), 0o600))
-	}
-
-	userFile := ""
-	if user != "" {
-		userFile = filepath.Join(t.TempDir(), "user.conf")
-		require.NoError(t, os.WriteFile(userFile, []byte(user), 0o600))
 	}
 
 	config.Reset()
@@ -217,7 +235,7 @@ func loadToolConfigFiles(t *testing.T, home, user, instance string, args ...stri
 		return af, sa, err
 	}
 
-	_, err := config.InitConfigFiles(config.Files{File: userFile}, instance, fs)
+	_, err := config.InitConfigFiles(files, instance, fs)
 
 	return af, sa, err
 }
@@ -1027,6 +1045,11 @@ func TestResolveSecretsRejectsNUL(t *testing.T) {
 
 	af, sa = parseToolConfig(t, "[cluster]\nuser = \"admin\"\npassword = \"a\\u0000b\"\n")
 	require.EqualError(t, af.ResolveSecrets(t.Context(), sa), "password in config file: password contains a NUL byte")
+
+	af, sa = parseToolConfig(t, fmt.Sprintf("[cluster]\nuser = \"admin\"\npassword = \"secrets:aql:nul\"\n\n"+
+		"[secret-agent]\nsa-address = %q\n", agent.Addr()))
+	require.EqualError(t, af.ResolveSecrets(t.Context(), sa),
+		"password in config file: secret agent returned a value containing a NUL byte for secrets:aql:nul")
 }
 
 func TestResolveSecretsWarnsOnStderrByDefault(t *testing.T) {

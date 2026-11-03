@@ -39,9 +39,9 @@ func TestConfFileFlagsUsage(t *testing.T) {
 		"Read this config file after /etc/aerospike/astools.conf and ~/.aerospike/astools.conf." +
 			" A later file overrides an earlier one, key by key.",
 		"--only-config-file string",
-		"Read only this config file.",
+		"Read only this config file. Cannot be combined with --config-file or --no-config-file.",
 		"--no-config-file",
-		"Do not read any config file.",
+		"Do not read any config file. Cannot be combined with --config-file or --only-config-file.",
 		"--instance string",
 		"Sections with this instance are read. With instance 'a', the sections cluster_a and" +
 			" secret-agent_a are read.",
@@ -50,6 +50,17 @@ func TestConfFileFlagsUsage(t *testing.T) {
 	}
 
 	require.NotContains(t, usage, "uda")
+}
+
+func TestConfFileFlagsUsageNamesCurrentDefaultFiles(t *testing.T) {
+	config.SetDefaultConfName("asvec")
+	t.Cleanup(func() { config.SetDefaultConfName(config.DefaultConfName) })
+
+	config.SetSystemConfDir("/opt/asvec")
+	t.Cleanup(func() { config.SetSystemConfDir(config.DefaultConfDir) })
+
+	usage := NewConfFileFlags().NewFlagSet(func(str string) string { return str }).FlagUsages()
+	require.Contains(t, usage, "Read this config file after /opt/asvec/asvec.conf and ~/.aerospike/asvec.conf.")
 }
 
 func TestConfFileFlagsRejectEmptyPath(t *testing.T) {
