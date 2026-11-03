@@ -3,6 +3,7 @@ package flags
 import (
 	"errors"
 	"fmt"
+	"path/filepath"
 
 	"github.com/aerospike/tools-common-go/config"
 	"github.com/spf13/pflag"
@@ -23,15 +24,22 @@ func NewConfFileFlags() *ConfFileFlags {
 }
 
 // NewFlagSet creates a new pflag.FlagSet with the config file flags.
-// The fmtUsage parameter is a function that formats the usage string.
+// The fmtUsage parameter is a function that formats the usage string. The
+// help names the default files, so call config.SetDefaultConfName and
+// config.SetSystemConfDir first.
 func (cf *ConfFileFlags) NewFlagSet(fmtUsage UsageFormatter) *pflag.FlagSet {
 	f := &pflag.FlagSet{}
 
+	name := config.ConfName()
+
 	f.Var(pathValue{&cf.File}, "config-file", fmtUsage(fmt.Sprintf(
-		"Read this config file after %s/%s.conf and ~/.aerospike/%[2]s.conf."+
-			" A later file overrides an earlier one, key by key.", config.DefaultConfDir, config.DefaultConfName)))
-	f.Var(pathValue{&cf.OnlyFile}, "only-config-file", fmtUsage("Read only this config file."))
-	f.BoolVar(&cf.NoFile, "no-config-file", false, fmtUsage("Do not read any config file."))
+		"Read this config file after %s and ~/.aerospike/%s.conf."+
+			" A later file overrides an earlier one, key by key.",
+		filepath.Join(config.SystemConfDir(), name+".conf"), name)))
+	f.Var(pathValue{&cf.OnlyFile}, "only-config-file", fmtUsage("Read only this config file."+
+		" Cannot be combined with --config-file or --no-config-file."))
+	f.BoolVar(&cf.NoFile, "no-config-file", false, fmtUsage("Do not read any config file."+
+		" Cannot be combined with --config-file or --only-config-file."))
 	f.StringVar(&cf.Instance, "instance", "", fmtUsage("Sections with this instance are read. With instance 'a',"+
 		" the sections cluster_a and secret-agent_a are read."))
 

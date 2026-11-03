@@ -60,14 +60,14 @@ func TestParseSecretAgentAddress(t *testing.T) {
 // parseSecretAgentFlags parses args as the command line, then applies config
 // values the way config.SetFlags does: through Set, without marking the flag
 // as changed, and only for flags not on the command line.
-func parseSecretAgentFlags(t *testing.T, args []string, config map[string]string) *SecretAgentFlags {
+func parseSecretAgentFlags(t *testing.T, args []string, conf map[string]string) *SecretAgentFlags {
 	t.Helper()
 
 	sa := NewDefaultSecretAgentFlags()
 	fs := sa.NewFlagSet(DefaultWrapHelpString)
 	require.NoError(t, fs.Parse(args))
 
-	for name, value := range config {
+	for name, value := range conf {
 		if !fs.Changed(name) {
 			require.NoError(t, fs.Lookup(name).Value.Set(value))
 		}

@@ -43,7 +43,10 @@ func SetDefaultConfName(name string) {
 // from the root commands PersistentPreRunE function with the flags of the current command.
 // It does not follow [include]; InitConfigFiles does. An instance section
 // bound with BindPFlagsWithInstanceFallback whose name has a dot is read only
-// from a .conf or .toml file.
+// from a .conf or .toml file. It reads userProvidedCfgFile, or else the first
+// <name> file in the SetDefaultConfDirs directories, the working directory first
+// by default. It has no --only-config-file or --no-config-file, so the OnlyFile
+// and NoFile of flags.ConfFileFlags have no effect on it.
 func InitConfig(userProvidedCfgFile, instance string, flags *pflag.FlagSet) (string, error) {
 	if userProvidedCfgFile != "" {
 		// Use config file from the flag.
@@ -136,21 +139,36 @@ func SetSystemConfDir(dir string) {
 	systemConfDir = dir
 }
 
+// SystemConfDir returns the directory SetSystemConfDir set.
+func SystemConfDir() string {
+	return systemConfDir
+}
+
+// ConfName returns the config file name SetDefaultConfName set.
+func ConfName() string {
+	return confName
+}
+
 // The deepest [include] level the C tools read, the top-level files being 0.
 const maxIncludeLevel = 3
 
 // Files selects the config files InitConfigFiles reads, as the --config-file,
 // --only-config-file and --no-config-file options of the Aerospike C tools do.
+// At most one of them may be set.
 type Files struct {
 	// File is read after the default files.
 	File string
-	// Only is the one file read, in place of the default files and File.
+	// Only is the one file read, in place of the default files.
 	Only string
-	// None reads no file. It cannot be combined with Only.
+	// None reads no file.
 	None bool
 }
 
-var errNoAndOnlyFile = errors.New("--no-config-file and only-config-file are mutually exclusive option. Please enable only one.") //nolint:revive,staticcheck // The C tools' message, word for word.
+var (
+	errNoAndOnlyFile = errors.New("--no-config-file and only-config-file are mutually exclusive option. Please enable only one.") //nolint:revive,staticcheck // The C tools' message, word for word.
+	errOnlyAndFile   = errors.New("--config-file and --only-config-file are mutually exclusive")
+	errNoAndFile     = errors.New("--config-file and --no-config-file are mutually exclusive")
+)
 
 // InitConfigFiles is InitConfig with the config file loading of the Aerospike
 // C tools. It reads /etc/aerospike/<name>.conf, then
@@ -159,7 +177,9 @@ var errNoAndOnlyFile = errors.New("--no-config-file and only-config-file are mut
 // file, and with files.None no file. Every file is read as TOML. A missing
 // default file is skipped. A files.File or files.Only that is missing or cannot
 // be read is an error, where the C tools warn and go on, since it may hold the
-// Secret Agent CA file.
+// Secret Agent CA file. For the same reason files.File with files.Only or
+// files.None is an error, where the C tools and asadm read only one of the
+// files or none.
 //
 // The files of a file's [include] section are read right after it: file, then
 // every regular file under directory in name order, without following links to
@@ -176,8 +196,13 @@ var errNoAndOnlyFile = errors.New("--no-config-file and only-config-file are mut
 // ignored, or an instance section with a dot that is not quoted, is an error.
 // It returns the files read, in order.
 func InitConfigFiles(files Files, instance string, flags *pflag.FlagSet) ([]string, error) {
-	if files.None && files.Only != "" {
+	switch {
+	case files.None && files.Only != "":
 		return nil, errNoAndOnlyFile
+	case files.File != "" && files.Only != "":
+		return nil, errOnlyAndFile
+	case files.File != "" && files.None:
+		return nil, errNoAndFile
 	}
 
 	var paths []string
