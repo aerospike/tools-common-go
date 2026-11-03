@@ -745,7 +745,7 @@ func e2eToolConfigFiles(
 
 	require.NoError(t, fs.Parse(args))
 
-	_, err := config.InitConfigFiles(file, instance, fs)
+	_, err := config.InitConfigFiles(config.Files{File: file}, instance, fs)
 	require.NoError(t, err)
 
 	return af, sa

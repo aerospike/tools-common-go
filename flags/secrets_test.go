@@ -217,7 +217,7 @@ func loadToolConfigFiles(t *testing.T, home, user, instance string, args ...stri
 		return af, sa, err
 	}
 
-	_, err := config.InitConfigFiles(userFile, instance, fs)
+	_, err := config.InitConfigFiles(config.Files{File: userFile}, instance, fs)
 
 	return af, sa, err
 }

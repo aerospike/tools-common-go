@@ -133,12 +133,26 @@ var systemConfDir = DefaultConfDir
 // The deepest [include] level the C tools read, the top-level files being 0.
 const maxIncludeLevel = 3
 
+// Files selects the config files InitConfigFiles reads, as the --config-file,
+// --only-config-file and --no-config-file options of the Aerospike C tools do.
+type Files struct {
+	// File is read after the default files.
+	File string
+	// Only is the one file read, in place of the default files and File.
+	Only string
+	// None reads no file. It cannot be combined with Only.
+	None bool
+}
+
+var errNoAndOnlyFile = errors.New("--no-config-file and only-config-file are mutually exclusive option. Please enable only one.") //nolint:revive,staticcheck // The C tools' message, word for word.
+
 // InitConfigFiles is InitConfig with the config file loading of the Aerospike
 // C tools. It reads /etc/aerospike/<name>.conf, then
-// $HOME/.aerospike/<name>.conf, then userProvidedCfgFile when given, and never
-// <name>.conf in the working directory. Every file is read as TOML. A missing
-// default file is skipped. A userProvidedCfgFile that is missing or cannot be
-// read is an error, where the C tools warn and go on, since it may hold the
+// $HOME/.aerospike/<name>.conf, then files.File when given, and never
+// <name>.conf in the working directory. With files.Only it reads only that
+// file, and with files.None no file. Every file is read as TOML. A missing
+// default file is skipped. A files.File or files.Only that is missing or cannot
+// be read is an error, where the C tools warn and go on, since it may hold the
 // Secret Agent CA file.
 //
 // The files of a file's [include] section are read right after it: file, then
@@ -155,17 +169,26 @@ const maxIncludeLevel = 3
 // each file before the merge. A section whose name matches only when case is
 // ignored, or an instance section with a dot that is not quoted, is an error.
 // It returns the files read, in order.
-func InitConfigFiles(userProvidedCfgFile, instance string, flags *pflag.FlagSet) ([]string, error) {
-	paths := []string{filepath.Join(systemConfDir, confName+".conf")}
-
-	if home, err := os.UserHomeDir(); err == nil {
-		paths = append(paths, filepath.Join(home, ".aerospike", confName+".conf"))
+func InitConfigFiles(files Files, instance string, flags *pflag.FlagSet) ([]string, error) {
+	if files.None && files.Only != "" {
+		return nil, errNoAndOnlyFile
 	}
 
-	defaults := len(paths)
+	var paths []string
 
-	if userProvidedCfgFile != "" {
-		paths = append(paths, userProvidedCfgFile)
+	defaults := 0
+
+	switch {
+	case files.None:
+	case files.Only != "":
+		paths = []string{files.Only}
+	default:
+		paths = defaultFiles()
+		defaults = len(paths)
+
+		if files.File != "" {
+			paths = append(paths, files.File)
+		}
 	}
 
 	loader := configLoader{instance: instance}
@@ -177,6 +200,18 @@ func InitConfigFiles(userProvidedCfgFile, instance string, flags *pflag.FlagSet)
 	}
 
 	return loader.paths, setFlags(instance, flags, loader.files)
+}
+
+// defaultFiles returns the system-wide file, then the user's file when the
+// home directory is known.
+func defaultFiles() []string {
+	paths := []string{filepath.Join(systemConfDir, confName+".conf")}
+
+	if home, err := os.UserHomeDir(); err == nil {
+		paths = append(paths, filepath.Join(home, ".aerospike", confName+".conf"))
+	}
+
+	return paths
 }
 
 type configLoader struct {
