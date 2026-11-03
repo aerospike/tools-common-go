@@ -7,12 +7,15 @@ import (
 	"context"
 	"crypto/rand"
 	"crypto/tls"
+	"crypto/x509"
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"os"
 	"path/filepath"
 	"strings"
@@ -28,6 +31,8 @@ import (
 	"github.com/docker/go-connections/nat"
 	"github.com/stretchr/testify/require"
 
+	"github.com/aerospike/tools-common-go/config"
+	"github.com/aerospike/tools-common-go/flags"
 	"github.com/aerospike/tools-common-go/secretagent"
 	"github.com/aerospike/tools-common-go/secretagent/secretagenttest"
 )
@@ -44,6 +49,9 @@ const (
 	otherValue   = "other-value"
 	pemValue     = "-----BEGIN TEST-----\nAQIDBA==\n-----END TEST-----\n"
 	unicodeValue = "pässwörd ✓"
+	wrongValue   = "wrong-secret"
+	keyPassValue = "k3y-pass"
+	envLikeValue = "env:SECRETAGENT_E2E_UNSET"
 )
 
 var e2e struct {
@@ -232,7 +240,10 @@ func pullImage(ctx context.Context, cli *docker.Client, ref string) error {
 
 func writeSecrets(dir string) error {
 	files := map[string]map[string]string{
-		"aql.json":   {passwordKey: testSecret, "pem": pemValue, "unicode": unicodeValue},
+		"aql.json": {
+			passwordKey: testSecret, "pem": pemValue, "unicode": unicodeValue, "wrong": wrongValue,
+			"keypass": keyPassValue, "keypass-newline": keyPassValue + "\n", "envlike": envLikeValue,
+		},
 		"other.json": {passwordKey: otherValue},
 	}
 
@@ -251,12 +262,12 @@ func writeSecrets(dir string) error {
 }
 
 func writeAgentConfig(dir string, spec *agentSpec) error {
-	config := "service:\n  tcp:\n    endpoint: 0.0.0.0:3005\n" + spec.tls +
+	conf := "service:\n  tcp:\n    endpoint: 0.0.0.0:3005\n" + spec.tls +
 		"secret-manager:\n  file:\n    convert-to-base64: true\n    resources:\n" +
 		"      aql: \"/agent/aql.json\"\n      other: \"/agent/other.json\"\n" +
 		"log:\n  level: debug\n"
 
-	return os.WriteFile(filepath.Join(dir, spec.name+".yaml"), []byte(config), 0o600)
+	return os.WriteFile(filepath.Join(dir, spec.name+".yaml"), []byte(conf), 0o600)
 }
 
 // shareWithAgent makes the flat dir readable by the container user, whatever
@@ -603,4 +614,272 @@ func TestE2EConcurrent(t *testing.T) {
 	for err := range errs {
 		require.NoError(t, err)
 	}
+}
+
+func e2eToolConfig(
+	t *testing.T, conf, instance string, args ...string,
+) (*flags.AerospikeFlags, *flags.SecretAgentFlags) {
+	t.Helper()
+
+	file := filepath.Join(t.TempDir(), "astools.conf")
+	require.NoError(t, os.WriteFile(file, []byte(conf), 0o600))
+
+	config.Reset()
+	t.Cleanup(config.Reset)
+
+	af := flags.NewDefaultAerospikeFlags()
+	sa := flags.NewDefaultSecretAgentFlags()
+
+	fs := af.NewFlagSetWithSecrets(flags.DefaultWrapHelpString)
+	config.BindPFlags(fs, "cluster")
+
+	saFlags := sa.NewFlagSet(flags.DefaultWrapHelpString)
+	config.BindPFlagsWithInstanceFallback(saFlags, "secret-agent")
+	fs.AddFlagSet(saFlags)
+
+	require.NoError(t, fs.Parse(args))
+
+	_, err := config.InitConfig(file, instance, fs)
+	require.NoError(t, err)
+
+	return af, sa
+}
+
+// TestE2EFetchedSecretsReachTheClient checks that the client policy a tool
+// logs in with, and loads its TLS key with, holds the values fetched from the
+// agent, used as is.
+func TestE2EFetchedSecretsReachTheClient(t *testing.T) {
+	t.Run("user and password", func(t *testing.T) {
+		for ref, want := range map[string]string{
+			"secrets:aql:password":        testSecret,
+			"secrets:aql:wrong":           wrongValue,
+			"secrets:aql:keypass-newline": keyPassValue + "\n",
+			"secrets:aql:envlike":         envLikeValue,
+		} {
+			af, sa := e2eToolConfig(t, "", "", "-U", "secrets:other:password", "-P", ref, "--sa-address", e2e.plainAddr)
+			require.NoError(t, af.ResolveSecrets(t.Context(), sa), ref)
+
+			policy, err := af.NewAerospikeConfig().NewClientPolicy()
+			require.NoError(t, err, ref)
+			require.Equal(t, otherValue, policy.User, ref)
+			require.Equal(t, want, policy.Password, ref)
+		}
+	})
+
+	t.Run("TLS key file password", func(t *testing.T) {
+		keyFile := encryptedKeyFile(t, e2e.pki.ClientKeyFile, keyPassValue)
+
+		for ref, ok := range map[string]bool{
+			"secrets:aql:keypass":         true,
+			"secrets:aql:wrong":           false,
+			"secrets:aql:keypass-newline": false,
+		} {
+			af, sa := e2eToolConfig(t, "", "", "--tls-enable", "--tls-cafile", e2e.pki.CAFile,
+				"--tls-certfile", e2e.pki.ClientCertFile, "--tls-keyfile", keyFile, "--tls-keyfile-password", ref,
+				"--sa-address", e2e.plainAddr)
+			require.NoError(t, af.ResolveSecrets(t.Context(), sa), ref)
+
+			policy, err := af.NewAerospikeConfig().NewClientPolicy()
+			if !ok {
+				require.Error(t, err, ref)
+				require.Regexp(t, "failed to (decrypt PEM Block|add certificate and key)", err.Error(), ref)
+
+				continue
+			}
+
+			require.NoError(t, err, ref)
+			require.Len(t, policy.TlsConfig.Certificates, 1, ref)
+		}
+	})
+}
+
+// encryptedKeyFile writes keyFile encrypted with password in the legacy PEM
+// form the Aerospike tools load.
+func encryptedKeyFile(t *testing.T, keyFile, password string) string {
+	t.Helper()
+
+	data, err := os.ReadFile(keyFile)
+	require.NoError(t, err)
+
+	block, _ := pem.Decode(data)
+	require.NotNil(t, block)
+
+	//nolint:staticcheck // The tools load legacy encrypted PEM keys, so the test must write one.
+	encrypted, err := x509.EncryptPEMBlock(rand.Reader, block.Type, block.Bytes, []byte(password), x509.PEMCipherAES256)
+	require.NoError(t, err)
+
+	path := filepath.Join(t.TempDir(), "encrypted-key.pem")
+	require.NoError(t, os.WriteFile(path, pem.EncodeToMemory(encrypted), 0o600))
+
+	return path
+}
+
+// e2eToolConfigFiles is e2eToolConfig with config.InitConfigFiles and conf as
+// the --config-file. A config name of its own keeps the files in /etc/aerospike
+// and the user's $HOME out.
+func e2eToolConfigFiles(
+	t *testing.T, conf, instance string, args ...string,
+) (*flags.AerospikeFlags, *flags.SecretAgentFlags) {
+	t.Helper()
+
+	t.Setenv("HOME", t.TempDir())
+
+	config.SetDefaultConfName("astools-e2e-test")
+	t.Cleanup(func() { config.SetDefaultConfName(config.DefaultConfName) })
+
+	file := filepath.Join(t.TempDir(), "astools.conf")
+	require.NoError(t, os.WriteFile(file, []byte(conf), 0o600))
+
+	config.Reset()
+	t.Cleanup(config.Reset)
+
+	af := flags.NewDefaultAerospikeFlags()
+	sa := flags.NewDefaultSecretAgentFlags()
+
+	fs := af.NewFlagSetWithSecrets(flags.DefaultWrapHelpString)
+	config.BindPFlags(fs, "cluster")
+
+	saFlags := sa.NewFlagSet(flags.DefaultWrapHelpString)
+	config.BindPFlagsWithInstanceFallback(saFlags, "secret-agent")
+	fs.AddFlagSet(saFlags)
+
+	require.NoError(t, fs.Parse(args))
+
+	_, err := config.InitConfigFiles(file, instance, fs)
+	require.NoError(t, err)
+
+	return af, sa
+}
+
+func TestE2EFlagsAndConfigFile(t *testing.T) {
+	untrusted, err := secretagenttest.GeneratePKI(t.TempDir())
+	require.NoError(t, err)
+
+	host, port, err := net.SplitHostPort(e2e.tlsAddr)
+	require.NoError(t, err)
+
+	ca := e2e.pki.CAFile
+	cluster := "user = \"secrets:other:password\"\npassword = \"secrets:aql:password\"\n\n"
+
+	tests := map[string]struct {
+		want     error
+		conf     string
+		instance string
+		args     []string
+	}{
+		"config file":        {conf: fmt.Sprintf("[secret-agent]\nsa-address = %q\nsa-ca-file = %q\n", e2e.tlsAddr, ca)},
+		"C spelling CA file": {conf: fmt.Sprintf("[secret-agent]\nsa-address = %q\nsa-cafile = %q\n", e2e.tlsAddr, ca)},
+		"host name, port on the command line": {
+			conf: fmt.Sprintf("[secret-agent]\nsa-address = \"localhost\"\nsa-ca-file = %q\n", ca),
+			args: []string{"--sa-port", port},
+		},
+		"CA file on the command line": {
+			conf: fmt.Sprintf("[secret-agent]\nsa-address = %q\nsa-port = %q\n", host, port),
+			args: []string{"--sa-ca-file", ca},
+		},
+		"instance section": {
+			conf: fmt.Sprintf("[secret-agent]\nsa-address = %q\n\n[secret-agent_e2e]\nsa-address = %q\nsa-ca-file = %q\n",
+				unreachableAddr, e2e.tlsAddr, ca),
+			instance: "e2e",
+		},
+		"untrusted CA": {
+			conf: fmt.Sprintf("[secret-agent]\nsa-address = %q\nsa-ca-file = %q\n", e2e.tlsAddr, untrusted.CAFile),
+			want: secretagent.ErrRequestFailed,
+		},
+		"plaintext to TLS agent": {
+			conf: fmt.Sprintf("[secret-agent]\nsa-address = %q\n", e2e.tlsAddr),
+			want: secretagent.ErrRequestFailed,
+		},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			section := "[cluster]\n"
+			if tt.instance != "" {
+				section = "[cluster_" + tt.instance + "]\n"
+			}
+
+			af, sa := e2eToolConfig(t, section+cluster+tt.conf, tt.instance, tt.args...)
+
+			err := af.ResolveSecrets(t.Context(), sa)
+			if tt.want != nil {
+				require.ErrorIs(t, err, tt.want)
+				require.NotContains(t, err.Error(), testSecret)
+
+				return
+			}
+
+			require.NoError(t, err)
+			require.Equal(t, otherValue, af.User)
+			require.Equal(t, testSecret, string(af.Password))
+		})
+	}
+
+	t.Run("instance value that is not a table", func(t *testing.T) {
+		base := fmt.Sprintf("[cluster_e2e]\n%s[secret-agent]\nsa-address = %q\nsa-ca-file = %q\n", cluster,
+			e2e.tlsAddr, ca)
+
+		for _, conf := range []string{
+			"secret-agent_e2e = \"x\"\n" + base,
+			base + "\n[[secret-agent_e2e]]\nsa-address = \"127.0.0.1:1\"\n",
+		} {
+			af, sa := e2eToolConfig(t, conf, "e2e")
+			require.NoError(t, af.ResolveSecrets(t.Context(), sa))
+
+			af, sa = e2eToolConfigFiles(t, conf, "e2e")
+			require.NoError(t, af.ResolveSecrets(t.Context(), sa))
+			require.Equal(t, otherValue, af.User)
+			require.Equal(t, testSecret, string(af.Password))
+		}
+	})
+
+	t.Run("instance name with a dot", func(t *testing.T) {
+		conf := fmt.Sprintf("[\"cluster_a.b\"]\n%s[\"secret-agent_a.b\"]\nsa-ca-file = %q\n", cluster, ca)
+
+		af, sa := e2eToolConfig(t, conf, "a.b", "--sa-address", e2e.tlsAddr)
+		require.NoError(t, af.ResolveSecrets(t.Context(), sa))
+		require.Equal(t, testSecret, string(af.Password))
+
+		af, sa = e2eToolConfigFiles(t, conf, "a.b", "--sa-address", e2e.tlsAddr)
+		require.NoError(t, af.ResolveSecrets(t.Context(), sa))
+		require.Equal(t, otherValue, af.User)
+		require.Equal(t, testSecret, string(af.Password))
+	})
+
+	t.Run("quoted instance section with a dot next to a nested one", func(t *testing.T) {
+		conf := fmt.Sprintf("[\"cluster_a.b\"]\n%s[\"secret-agent_a.b\"]\nsa-address = %q\nsa-ca-file = %q\n\n"+
+			"[secret-agent_a.b]\nsa-address = %q\n", cluster, e2e.tlsAddr, ca, unreachableAddr)
+
+		af, sa := e2eToolConfig(t, conf, "a.b")
+		require.NoError(t, af.ResolveSecrets(t.Context(), sa))
+		require.Equal(t, testSecret, string(af.Password))
+
+		af, sa = e2eToolConfigFiles(t, conf, "a.b")
+		require.NoError(t, af.ResolveSecrets(t.Context(), sa))
+		require.Equal(t, otherValue, af.User)
+		require.Equal(t, testSecret, string(af.Password))
+	})
+
+	t.Run("CA file in an included file", func(t *testing.T) {
+		dir := t.TempDir()
+		include := filepath.Join(dir, "include.conf")
+		require.NoError(t, os.WriteFile(include, fmt.Appendf(nil, "[secret-agent]\nsa-ca-file = %q\n", ca), 0o600))
+
+		conf := fmt.Sprintf("[cluster]\n%s[secret-agent]\nsa-address = %q\n\n[include]\n", cluster, e2e.tlsAddr)
+
+		for _, entry := range []string{fmt.Sprintf("file = %q\n", include), fmt.Sprintf("directory = %q\n", dir)} {
+			af, sa := e2eToolConfigFiles(t, conf+entry, "")
+			require.NoError(t, af.ResolveSecrets(t.Context(), sa), entry)
+			require.Equal(t, otherValue, af.User)
+			require.Equal(t, testSecret, string(af.Password))
+		}
+	})
+
+	t.Run("crafted reference", func(t *testing.T) {
+		af, sa := e2eToolConfig(t, fmt.Sprintf("[cluster]\nuser = %q\n\n[secret-agent]\nsa-address = %q\nsa-ca-file = %q\n",
+			`secrets:aql","Resource":"other:password`, e2e.tlsAddr, ca), "")
+
+		require.ErrorIs(t, af.ResolveSecrets(t.Context(), sa), secretagent.ErrRequestFailed)
+		require.NotEqual(t, otherValue, af.User)
+	})
 }

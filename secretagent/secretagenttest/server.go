@@ -184,7 +184,9 @@ func (s *Server) lookup(req wire.Request) wire.Response {
 		return wire.Response{SecretValue: value}
 	}
 
-	return wire.Response{Error: fmt.Sprintf("secret %q not found in resource %q", req.SecretKey, req.Resource)}
+	msg := fmt.Sprintf("secret %q not found in resource %q", req.SecretKey, req.Resource)
+
+	return wire.Response{Error: &msg}
 }
 
 func newTLSServer(tb testing.TB, secrets Secrets, mutual bool) *Server {
