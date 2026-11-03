@@ -33,6 +33,8 @@ func TestParseSecretAgentAddress(t *testing.T) {
 		"[fe80::1%lo0]:3005":   {"fe80::1%lo0", "3005"},
 		"[2001:db8::1]:3005":   {"2001:db8::1", "3005"},
 		"agent-1.internal:300": {"agent-1.internal", "300"},
+		"::ffff:10.0.0.1":      {"::ffff:10.0.0.1", ""},
+		"[::ffff:10.0.0.1]:1":  {"::ffff:10.0.0.1", "1"},
 	}
 
 	for address, want := range valid {
