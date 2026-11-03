@@ -510,6 +510,22 @@ func TestInitConfigFilesErrors(t *testing.T) {
 	require.ErrorContains(t, err, "failed to read config file "+system)
 }
 
+func TestSetSystemConfDir(t *testing.T) {
+	system, _ := setupConfigFiles(t)
+	writeConfig(t, system, "[group1]\nstr = \"system\"\n")
+
+	dir := t.TempDir()
+	SetSystemConfDir(dir)
+
+	moved := writeConfig(t, filepath.Join(dir, DefaultConfName+".conf"), "[group1]\nint = 5\n")
+	flagSet := newGroupFlags(t, "group1", false)
+
+	files, err := InitConfigFiles(Files{}, "", flagSet)
+	require.NoError(t, err)
+	require.Equal(t, []string{moved}, files)
+	requireGroupFlags(t, flagSet, "", 5, false)
+}
+
 func TestInitConfigFilesOnlyFile(t *testing.T) {
 	system, home := setupConfigFiles(t)
 	writeConfig(t, system, "[group1]\nstr = \"system\"\n")

@@ -8,6 +8,8 @@ import (
 )
 
 // ConfFileFlags represents the flags related to setting up the config file.
+// Pass Files() to config.InitConfigFiles. config.InitConfig reads File only, so
+// --only-config-file and --no-config-file do nothing there.
 type ConfFileFlags struct {
 	File     string // Config file read after the default ones.
 	OnlyFile string // The only config file read.

@@ -130,6 +130,12 @@ func checkFileSectionNames(file, instance string) error {
 // Directory of the system-wide file InitConfigFiles reads.
 var systemConfDir = DefaultConfDir
 
+// SetSystemConfDir sets the directory of the system-wide file InitConfigFiles
+// reads, DefaultConfDir by default. Tests use it to keep the host's file out.
+func SetSystemConfDir(dir string) {
+	systemConfDir = dir
+}
+
 // The deepest [include] level the C tools read, the top-level files being 0.
 const maxIncludeLevel = 3
 
