@@ -51,3 +51,14 @@ func TestConfFileFlagsUsage(t *testing.T) {
 
 	require.NotContains(t, usage, "uda")
 }
+
+func TestConfFileFlagsRejectEmptyPath(t *testing.T) {
+	for _, option := range []string{"--config-file", "--only-config-file"} {
+		t.Run(option, func(t *testing.T) {
+			flagSet := NewConfFileFlags().NewFlagSet(func(str string) string { return str })
+
+			err := flagSet.Parse([]string{option, ""})
+			require.EqualError(t, err, `invalid argument "" for "`+option+`" flag: expected a path`)
+		})
+	}
+}

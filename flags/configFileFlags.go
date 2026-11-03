@@ -1,6 +1,7 @@
 package flags
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/aerospike/tools-common-go/config"
@@ -26,10 +27,10 @@ func NewConfFileFlags() *ConfFileFlags {
 func (cf *ConfFileFlags) NewFlagSet(fmtUsage UsageFormatter) *pflag.FlagSet {
 	f := &pflag.FlagSet{}
 
-	f.StringVar(&cf.File, "config-file", "", fmtUsage(fmt.Sprintf(
+	f.Var(pathValue{&cf.File}, "config-file", fmtUsage(fmt.Sprintf(
 		"Read this config file after %s/%s.conf and ~/.aerospike/%[2]s.conf."+
 			" A later file overrides an earlier one, key by key.", config.DefaultConfDir, config.DefaultConfName)))
-	f.StringVar(&cf.OnlyFile, "only-config-file", "", fmtUsage("Read only this config file."))
+	f.Var(pathValue{&cf.OnlyFile}, "only-config-file", fmtUsage("Read only this config file."))
 	f.BoolVar(&cf.NoFile, "no-config-file", false, fmtUsage("Do not read any config file."))
 	f.StringVar(&cf.Instance, "instance", "", fmtUsage("Sections with this instance are read. With instance 'a',"+
 		" the sections cluster_a and secret-agent_a are read."))
@@ -40,4 +41,30 @@ func (cf *ConfFileFlags) NewFlagSet(fmtUsage UsageFormatter) *pflag.FlagSet {
 // Files returns the config files the flags select, for config.InitConfigFiles.
 func (cf *ConfFileFlags) Files() config.Files {
 	return config.Files{File: cf.File, Only: cf.OnlyFile, None: cf.NoFile}
+}
+
+// pathValue is a config file path. An empty one is rejected, where the C tools
+// warn that the file cannot be read.
+type pathValue struct{ path *string }
+
+func (v pathValue) String() string {
+	if v.path == nil {
+		return ""
+	}
+
+	return *v.path
+}
+
+func (v pathValue) Set(path string) error {
+	if path == "" {
+		return errors.New("expected a path")
+	}
+
+	*v.path = path
+
+	return nil
+}
+
+func (pathValue) Type() string {
+	return "string"
 }
