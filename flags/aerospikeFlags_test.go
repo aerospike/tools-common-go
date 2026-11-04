@@ -7,6 +7,7 @@ import (
 
 	as "github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/tools-common-go/client"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -327,4 +328,50 @@ func (s *FlagsTestSuite) TestNewAerospikeConfig() {
 // a normal test function and pass our suite to suite.Run
 func TestRunFlagsTestSuite(t *testing.T) {
 	suite.Run(t, new(FlagsTestSuite))
+}
+
+func TestAuthModeRequiresTLS(t *testing.T) {
+	t.Parallel()
+
+	const needsTLS = "TLS is required for external or PKI authentication"
+
+	tests := map[string]struct {
+		wantErr string
+		args    []string
+		mode    as.AuthMode
+	}{
+		"EXTERNAL without TLS":          {args: []string{"--auth", "EXTERNAL"}, wantErr: needsTLS},
+		"PKI without TLS":               {args: []string{"--auth", "PKI"}, wantErr: needsTLS},
+		"EXTERNAL with TLS":             {args: []string{"--auth", "EXTERNAL", "--tls-enable"}, mode: as.AuthModeExternal},
+		"EXTERNAL_INSECURE without TLS": {args: []string{"--auth", "EXTERNAL_INSECURE"}, mode: as.AuthModeExternal},
+		"EXTERNAL_INSECURE with TLS": {
+			args: []string{"--auth", "EXTERNAL_INSECURE", "--tls-enable"}, mode: as.AuthModeExternal,
+		},
+		"INTERNAL without TLS": {args: []string{"--auth", "INTERNAL"}, mode: as.AuthModeInternal},
+		"PKI with TLS":         {args: []string{"--auth", "PKI", "--tls-enable"}, mode: as.AuthModePKI},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			af := NewDefaultAerospikeFlags()
+			require.NoError(t, af.NewFlagSet(DefaultWrapHelpString).Parse(append(tt.args, "-U", "admin", "-P", "admin")))
+
+			policy, err := af.NewAerospikeConfig().NewClientPolicy()
+			if tt.wantErr != "" {
+				require.EqualError(t, err, tt.wantErr)
+				return
+			}
+
+			require.NoError(t, err)
+			require.Equal(t, tt.mode, policy.AuthMode)
+		})
+	}
+}
+
+func TestAuthModeFromConfigFile(t *testing.T) {
+	af, _, err := loadToolConfig(t, "[cluster]\nauth = \"EXTERNAL_INSECURE\"\n", "")
+	require.NoError(t, err)
+	require.Equal(t, "EXTERNAL_INSECURE", af.AuthMode.String())
 }

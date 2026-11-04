@@ -397,7 +397,7 @@ func TestResolveSecretsExpandedValuesStayLiteral(t *testing.T) {
 			got:  func(af *AerospikeFlags) string { return string(af.TLSKeyFilePass) },
 		},
 		"cert file": {
-			args: []string{"--tls-cafile", "b64:" + encode(expanded)},
+			args: []string{"--tls-enable", "--tls-cafile", "b64:" + encode(expanded)},
 			got:  func(af *AerospikeFlags) string { return string(af.TLSRootCAFile) },
 		},
 	}
@@ -1210,6 +1210,27 @@ func TestResolveSecretsFetchedValuesUsedAsIs(t *testing.T) {
 			require.Equal(t, value, af.User)
 			require.Equal(t, value, string(af.Password))
 			require.Equal(t, value, string(af.TLSKeyFilePass))
+		})
+	}
+}
+
+func TestResolveSecretsPKIDropsUser(t *testing.T) {
+	tests := map[string]struct {
+		conf string
+		args []string
+	}{
+		"secrets: on the command line": {args: []string{"--auth", "PKI", "-U", "secrets:aql:user"}},
+		"secrets: in the config file":  {conf: "[cluster]\nauth = \"PKI\"\nuser = \"secrets:aql:user\"\n"},
+		"literal":                      {args: []string{"--auth", "PKI", "-U", "admin"}},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			af, sa, err := loadToolConfig(t, tt.conf, "", append(tt.args, "--sa-address", unreachableAgent)...)
+			require.NoError(t, err)
+
+			require.NoError(t, af.ResolveSecrets(t.Context(), sa))
+			require.Empty(t, af.User)
 		})
 	}
 }

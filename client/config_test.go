@@ -17,7 +17,7 @@ func TestAerospikeConfig_NewClientPolicy(t *testing.T) {
 	config := &AerospikeConfig{
 		User:     "testUser",
 		Password: "testPassword",
-		AuthMode: as.AuthModeExternal,
+		AuthMode: as.AuthModeInternal,
 	}
 
 	expectedClientPolicy := as.NewClientPolicy()
@@ -37,6 +37,23 @@ func TestAerospikeConfig_NewClientPolicy(t *testing.T) {
 			clientPolicy,
 			expectedClientPolicy,
 		)
+	}
+}
+
+func TestAerospikeConfig_NewClientPolicyAuthModeNeedsTLS(t *testing.T) {
+	for _, mode := range []as.AuthMode{as.AuthModeExternal, as.AuthModePKI} {
+		config := &AerospikeConfig{AuthMode: mode}
+
+		_, err := config.NewClientPolicy()
+		if err == nil || err.Error() != "TLS is required for external or PKI authentication" {
+			t.Fatalf("NewClientPolicy() with auth mode %v error = %v, want the C client's TLS error", mode, err)
+		}
+
+		config.TLS = &TLSConfig{}
+
+		if _, err = config.NewClientPolicy(); err != nil {
+			t.Fatalf("NewClientPolicy() with auth mode %v and TLS returned an unexpected error: %v", mode, err)
+		}
 	}
 }
 
