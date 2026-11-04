@@ -44,7 +44,8 @@ func (af *AerospikeFlags) NewFlagSet(fmtUsage UsageFormatter) *pflag.FlagSet {
 	f.VarP(&af.Password, "password", "P", fmtUsage("The Aerospike password for the connection to the Aerospike cluster."))
 	f.Var(&af.AuthMode, "auth", fmtUsage("The authentication mode used by the Aerospike server."+
 		" INTERNAL uses standard user/pass. EXTERNAL uses external methods (like LDAP)"+
-		" which are configured on the server. EXTERNAL requires TLS. PKI allows TLS"+
+		" which are configured on the server. EXTERNAL requires TLS. EXTERNAL_INSECURE is EXTERNAL"+
+		" without TLS, which sends the password in clear. PKI requires TLS, and allows TLS"+
 		" authentication and authorization based on a certificate. No username needs to be configured."))
 	f.BoolVar(&af.TLSEnable, "tls-enable", false, fmtUsage("Enable TLS authentication with Aerospike."+
 		" If false, other TLS options are ignored.",
@@ -76,7 +77,8 @@ func (af *AerospikeFlags) NewFlagSet(fmtUsage UsageFormatter) *pflag.FlagSet {
 // wrapped, so fmtUsage is not applied to it.
 //
 // Call it once per AerospikeFlags, and call ResolveSecrets after parsing:
-// until then --password and --tls-keyfile-password hold the text as given.
+// until then --password and --tls-keyfile-password hold the text as given, and
+// the TLS file options are not read.
 func (af *AerospikeFlags) NewFlagSetWithSecrets(fmtUsage UsageFormatter) *pflag.FlagSet {
 	f := af.NewFlagSet(fmtUsage)
 	f.Lookup("user").Usage = fmtUsage(userUsage + " A secrets:<resource>:<key> value is fetched from the Secret Agent.")
@@ -133,6 +135,11 @@ func (af *AerospikeFlags) NewAerospikeConfig() *client.AerospikeConfig {
 	aerospikeConf.Password = string(af.Password)
 	aerospikeConf.AuthMode = as.AuthMode(af.AuthMode)
 	aerospikeConf.UseServicesAlternate = af.UseServicesAlternate
+
+	if af.AuthMode == AuthModeExternalInsecure {
+		aerospikeConf.AuthMode = as.AuthModeExternal
+		aerospikeConf.ExternalInsecure = true
+	}
 
 	if af.TLSEnable {
 		rootCA := [][]byte{}
