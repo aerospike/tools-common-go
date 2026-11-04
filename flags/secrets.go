@@ -163,6 +163,7 @@ type passwordOption struct {
 	isRef       *bool
 	unread      *bool
 	label       string
+	ref         string
 	maxLen      int
 	used        bool
 	firstLine   bool
@@ -178,6 +179,7 @@ func (af *AerospikeFlags) passwordOptions() []passwordOption {
 			isRef:       &af.secretRefs.password,
 			unread:      &af.secretRefs.unreadPassword,
 			label:       af.optionLabel("password"),
+			ref:         refText(af.secretRefs.password, af.Password),
 			maxLen:      passwordMaxLen,
 			used:        af.User != "" && !pki,
 			warnIgnored: af.User == "" && !pki,
@@ -187,6 +189,7 @@ func (af *AerospikeFlags) passwordOptions() []passwordOption {
 			isRef:     &af.secretRefs.tlsKeyFilePass,
 			unread:    &af.secretRefs.unreadTLSKeyFilePass,
 			label:     af.optionLabel("tls-keyfile-password"),
+			ref:       refText(af.secretRefs.tlsKeyFilePass, af.TLSKeyFilePass),
 			maxLen:    tlsKeyFilePasswordMaxLen,
 			used:      len(af.TLSKeyFile) != 0,
 			firstLine: true,
@@ -194,15 +197,24 @@ func (af *AerospikeFlags) passwordOptions() []passwordOption {
 	}
 }
 
+// refText is the secrets: reference value holds when isRef is set.
+func refText(isRef bool, value PasswordFlag) string {
+	if !isRef {
+		return ""
+	}
+
+	return string(value)
+}
+
 // read resolves an unread value. A value fetched from the Secret Agent is used
 // as is and only checked for NUL bytes and length.
 func (p passwordOption) read() error {
 	if !*p.unread {
-		if err := checkNoNUL(p.label, string(*p.value)); err != nil {
-			return err
+		if strings.IndexByte(string(*p.value), 0) >= 0 {
+			return fmt.Errorf("%s: secret agent returned a value containing a NUL byte for %s", p.label, p.ref)
 		}
 
-		return checkPasswordLen(p.label, "password", string(*p.value), p.maxLen)
+		return checkPasswordLen(p.label, "value from "+p.ref, string(*p.value), p.maxLen)
 	}
 
 	password, err := readPassword(p.label, string(*p.value), p.maxLen, p.firstLine)

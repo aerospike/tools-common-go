@@ -182,6 +182,30 @@ func loadToolConfigFiles(t *testing.T, home, user, instance string, args ...stri
 ) {
 	t.Helper()
 
+	userFile := ""
+	if user != "" {
+		userFile = writeToolConfig(t, "user.conf", user)
+	}
+
+	return loadToolConfigFileSet(t, home, config.Files{File: userFile}, instance, args...)
+}
+
+func writeToolConfig(t *testing.T, name, conf string) string {
+	t.Helper()
+
+	path := filepath.Join(t.TempDir(), name)
+	require.NoError(t, os.WriteFile(path, []byte(conf), 0o600))
+
+	return path
+}
+
+// loadToolConfigFileSet is loadToolConfigFiles with the files read given as a
+// config.Files.
+func loadToolConfigFileSet(t *testing.T, home string, files config.Files, instance string, args ...string) (
+	*AerospikeFlags, *SecretAgentFlags, error,
+) {
+	t.Helper()
+
 	homeDir := t.TempDir()
 	t.Setenv("HOME", homeDir)
 
@@ -192,12 +216,6 @@ func loadToolConfigFiles(t *testing.T, home, user, instance string, args ...stri
 		require.NoError(t, os.Mkdir(filepath.Join(homeDir, ".aerospike"), 0o700))
 		require.NoError(t, os.WriteFile(filepath.Join(homeDir, ".aerospike", "astools-flags-test.conf"),
 			[]byte(home), 0o600))
-	}
-
-	userFile := ""
-	if user != "" {
-		userFile = filepath.Join(t.TempDir(), "user.conf")
-		require.NoError(t, os.WriteFile(userFile, []byte(user), 0o600))
 	}
 
 	config.Reset()
@@ -217,7 +235,7 @@ func loadToolConfigFiles(t *testing.T, home, user, instance string, args ...stri
 		return af, sa, err
 	}
 
-	_, err := config.InitConfigFiles(userFile, instance, fs)
+	_, err := config.InitConfigFiles(files, instance, fs)
 
 	return af, sa, err
 }
@@ -950,7 +968,7 @@ func TestResolveSecretsPasswordLimits(t *testing.T) {
 		},
 		"secret 64": {
 			args: append([]string{"-P", "secrets:aql:over63"}, user...),
-			want: "--password: password is longer than 63 bytes",
+			want: "--password: value from secrets:aql:over63 is longer than 63 bytes",
 		},
 		"source 64": {
 			args: append([]string{"-P", "b64:" + encode(over63)}, user...),
@@ -962,7 +980,7 @@ func TestResolveSecretsPasswordLimits(t *testing.T) {
 		},
 		"secret 1025": {
 			args: append([]string{"--tls-keyfile-password", "secrets:aql:over1024"}, keyFile...),
-			want: "--tls-keyfile-password: password is longer than 1024 bytes",
+			want: "--tls-keyfile-password: value from secrets:aql:over1024 is longer than 1024 bytes",
 		},
 		"source 1025": {
 			args: append([]string{"--tls-keyfile-password", "b64:" + encode(over1024)}, keyFile...),
@@ -994,7 +1012,8 @@ func TestResolveSecretsPasswordLimitsFromConfigFile(t *testing.T) {
 
 	af, sa := parseToolConfig(t, fmt.Sprintf(
 		"[cluster]\nuser = \"admin\"\npassword = \"secrets:aql:over63\"\n\n[secret-agent]\nsa-address = %q\n", agent.Addr()))
-	require.EqualError(t, af.ResolveSecrets(t.Context(), sa), "password in config file: password is longer than 63 bytes")
+	require.EqualError(t, af.ResolveSecrets(t.Context(), sa),
+		"password in config file: value from secrets:aql:over63 is longer than 63 bytes")
 
 	af, sa = parseToolConfig(t, fmt.Sprintf("[cluster]\nuser = \"admin\"\npassword = %q\n",
 		strings.Repeat("p", passwordMaxLen+1)))
@@ -1016,14 +1035,21 @@ func TestResolveSecretsRejectsNUL(t *testing.T) {
 	agent := secretagenttest.NewServer(t, secretagenttest.Secrets{"aql": {"nul": encode("a\x00b")}})
 
 	af, sa := parseToolFlags(t, "-U", "admin", "-P", "secrets:aql:nul", "--sa-address", agent.Addr())
-	require.EqualError(t, af.ResolveSecrets(t.Context(), sa), "--password: password contains a NUL byte")
+	require.EqualError(t, af.ResolveSecrets(t.Context(), sa),
+		"--password: secret agent returned a value containing a NUL byte for secrets:aql:nul")
 
 	af, sa = parseToolFlags(t, "--tls-enable", "--tls-keyfile", "file:"+testFileDataPath,
 		"--tls-keyfile-password", "secrets:aql:nul", "--sa-address", agent.Addr())
-	require.EqualError(t, af.ResolveSecrets(t.Context(), sa), "--tls-keyfile-password: password contains a NUL byte")
+	require.EqualError(t, af.ResolveSecrets(t.Context(), sa),
+		"--tls-keyfile-password: secret agent returned a value containing a NUL byte for secrets:aql:nul")
 
 	af, sa = parseToolConfig(t, "[cluster]\nuser = \"admin\"\npassword = \"a\\u0000b\"\n")
 	require.EqualError(t, af.ResolveSecrets(t.Context(), sa), "password in config file: password contains a NUL byte")
+
+	af, sa = parseToolConfig(t, fmt.Sprintf("[cluster]\nuser = \"admin\"\npassword = \"secrets:aql:nul\"\n\n"+
+		"[secret-agent]\nsa-address = %q\n", agent.Addr()))
+	require.EqualError(t, af.ResolveSecrets(t.Context(), sa),
+		"password in config file: secret agent returned a value containing a NUL byte for secrets:aql:nul")
 }
 
 func TestResolveSecretsWarnsOnStderrByDefault(t *testing.T) {

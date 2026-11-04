@@ -422,9 +422,7 @@ func isIPv6(host string) bool {
 		return false
 	}
 
-	ip := net.ParseIP(addr)
-
-	return ip != nil && ip.To4() == nil
+	return net.ParseIP(addr) != nil && strings.Contains(addr, ":")
 }
 
 // validPort accepts at most 5 digits, as asadm does, where asbackup, aql and
