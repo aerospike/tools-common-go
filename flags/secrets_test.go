@@ -393,8 +393,10 @@ func TestResolveSecretsExpandedValuesStayLiteral(t *testing.T) {
 			got:  password,
 		},
 		"key file password": {
-			args: []string{"--tls-keyfile", "file:" + testFileDataPath, "--tls-keyfile-password", "b64:" + encode(expanded)},
-			got:  func(af *AerospikeFlags) string { return string(af.TLSKeyFilePass) },
+			args: []string{
+				"--tls-enable", "--tls-keyfile", "file:" + testFileDataPath, "--tls-keyfile-password", "b64:" + encode(expanded),
+			},
+			got: func(af *AerospikeFlags) string { return string(af.TLSKeyFilePass) },
 		},
 		"cert file": {
 			args: []string{"--tls-enable", "--tls-cafile", "b64:" + encode(expanded)},
@@ -660,7 +662,7 @@ func TestResolveSecretsReadsPasswordSources(t *testing.T) {
 
 	af, sa := parseToolFlags(t,
 		"-U", "admin", "-P", "env:TCG_TEST_PASSWORD",
-		"--tls-keyfile", "file:"+testFileDataPath, "--tls-keyfile-password", "file:"+keyPassFile,
+		"--tls-enable", "--tls-keyfile", "file:"+testFileDataPath, "--tls-keyfile-password", "file:"+keyPassFile,
 		"--sa-address", unreachableAgent,
 	)
 
@@ -763,7 +765,7 @@ func TestResolveSecretsTrimsKeyFilePasswordFromConfigFile(t *testing.T) {
 func TestResolveSecretsCommandLineLabels(t *testing.T) {
 	t.Parallel()
 
-	keyFile := []string{"--tls-keyfile", "file:" + testFileDataPath}
+	keyFile := []string{"--tls-enable", "--tls-keyfile", "file:" + testFileDataPath}
 
 	tests := map[string]struct {
 		want string
@@ -806,7 +808,8 @@ func TestResolveSecretsConfigFileLabels(t *testing.T) {
 			want: "password in config file: file: requires a path",
 		},
 		"key file password": {
-			conf: fmt.Sprintf("[cluster]\ntls-keyfile = %q\ntls-keyfile-password = \"env:\"\n", testFileDataPath),
+			conf: fmt.Sprintf("[cluster]\ntls-enable = true\ntls-keyfile = %q\ntls-keyfile-password = \"env:\"\n",
+				testFileDataPath),
 			want: "tls-keyfile-password in config file: env: requires a variable name",
 		},
 		"instance section": {
@@ -1110,8 +1113,7 @@ func TestNewFlagSetWithSecretsPasswordUsage(t *testing.T) {
 		"'file:' or 'secrets:' must be given as 'b64:'.",
 		"Surrounding whitespace is trimmed before the form is read. A",
 		"password with surrounding whitespace must be given as 'b64:'.",
-		"The password is read only when a key file is set. It must be at",
-		"most 1024 bytes.",
+		"The password must be at most 1024 bytes.",
 		"A value fetched with 'secrets:' is used as-is.",
 		"Default: none",
 	}, strings.Split(fs.Lookup("tls-keyfile-password").Usage, "\n"))
