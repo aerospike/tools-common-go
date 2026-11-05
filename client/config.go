@@ -16,8 +16,8 @@ type AerospikeConfig struct {
 	Password string
 	Seeds    HostTLSPortSlice
 	AuthMode as.AuthMode
-	// ExternalInsecure allows external authentication without TLS, which sends
-	// the password in clear.
+	// ExternalInsecure allows external authentication without TLS. The Go
+	// client's cluster still refuses it.
 	ExternalInsecure     bool
 	UseServicesAlternate bool
 }
@@ -30,8 +30,7 @@ func NewDefaultAerospikeConfig() *AerospikeConfig {
 }
 
 // NewClientPolicy creates a new Aerospike client policy based on the
-// AerospikeConfig. External and PKI authentication require TLS, as in the C
-// client, unless ExternalInsecure allows external authentication without it.
+// AerospikeConfig.
 func (ac *AerospikeConfig) NewClientPolicy() (*as.ClientPolicy, error) {
 	if ac.TLS == nil &&
 		(ac.AuthMode == as.AuthModePKI || (ac.AuthMode == as.AuthModeExternal && !ac.ExternalInsecure)) {

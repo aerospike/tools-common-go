@@ -45,8 +45,9 @@ func (af *AerospikeFlags) NewFlagSet(fmtUsage UsageFormatter) *pflag.FlagSet {
 	f.Var(&af.AuthMode, "auth", fmtUsage("The authentication mode used by the Aerospike server."+
 		" INTERNAL uses standard user/pass. EXTERNAL uses external methods (like LDAP)"+
 		" which are configured on the server. EXTERNAL requires TLS. EXTERNAL_INSECURE is EXTERNAL"+
-		" without TLS, which sends the password in clear. PKI requires TLS, and allows TLS"+
-		" authentication and authorization based on a certificate. No username needs to be configured."))
+		" without the TLS requirement: without TLS it sends the password in clear, and some tools"+
+		" still refuse it without TLS. PKI requires TLS, and allows TLS authentication and"+
+		" authorization based on a certificate. No username needs to be configured."))
 	f.BoolVar(&af.TLSEnable, "tls-enable", false, fmtUsage("Enable TLS authentication with Aerospike."+
 		" If false, other TLS options are ignored.",
 	))
@@ -123,8 +124,7 @@ A password that itself begins with 'env:', 'env-b64:', 'b64:',
 'file:' or 'secrets:' must be given as 'b64:'.
 Surrounding whitespace is trimmed before the form is read. A
 password with surrounding whitespace must be given as 'b64:'.
-The password is read only when a key file is set. It must be at
-most 1024 bytes.
+The password must be at most 1024 bytes.
 A value fetched with 'secrets:' is used as-is.
 Default: none`
 

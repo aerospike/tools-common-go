@@ -35,9 +35,8 @@ var errSecretsNotTracked = errors.New("secret references are not tracked, use Ne
 // --password is read only with a user and an auth mode other than PKI, and
 // --tls-keyfile-password only with a key file. Otherwise the value is dropped,
 // and a --password source or secrets: value without a user is reported to the
-// warning handler. With PKI the user is dropped too, since the server takes it
-// from the certificate. The TLS file options are read, and their secrets:
-// values fetched, only with --tls-enable.
+// warning handler. PKI drops the user, and the TLS options are read only with
+// --tls-enable.
 // --password must be at most 63 bytes and --tls-keyfile-password at most 1024
 // bytes, whatever their source. Errors name the option, or the config file key
 // when the value came from the config file.
@@ -170,13 +169,11 @@ type secretRefs struct {
 
 var tlsFileOptions = []string{"tls-cafile", "tls-capath", "tls-certfile", "tls-keyfile"}
 
-// readTLSFiles reads the TLS file options when TLS is enabled, and otherwise
-// drops them.
 func (af *AerospikeFlags) readTLSFiles() error {
 	texts := af.secretRefs.tlsFileText
-	af.secretRefs.tlsFileText = map[string]string{}
 
 	if !af.TLSEnable {
+		clear(texts)
 		return nil
 	}
 
@@ -189,6 +186,8 @@ func (af *AerospikeFlags) readTLSFiles() error {
 		if err := af.secretRefs.tlsFileSet[name](text); err != nil {
 			return fmt.Errorf("%s: %w", af.optionLabel(name), err)
 		}
+
+		delete(texts, name)
 	}
 
 	return nil
@@ -244,7 +243,7 @@ func (af *AerospikeFlags) passwordOptions() []passwordOption {
 			label:     af.optionLabel("tls-keyfile-password"),
 			ref:       refText(af.secretRefs.tlsKeyFilePass, af.TLSKeyFilePass),
 			maxLen:    tlsKeyFilePasswordMaxLen,
-			used:      af.keyFileGiven(),
+			used:      af.TLSEnable && af.keyFileGiven(),
 			firstLine: true,
 		},
 	}
@@ -330,7 +329,6 @@ func (af *AerospikeFlags) trackSecretRefs(f *pflag.FlagSet) {
 	af.secretRefs.tracked = true
 }
 
-// tlsPathValue keeps the text of --tls-capath for ResolveSecrets to read.
 type tlsPathValue struct {
 	pflag.Value
 	pend func(text string, pend bool)
@@ -346,10 +344,8 @@ type secretRefValue struct {
 	isRef  *bool
 	unread *bool
 	setRaw func(string)
-	// pend is set for the TLS file options, whose text other than a secrets:
-	// value is kept for ResolveSecrets to read.
-	pend func(text string, pend bool)
-	trim bool
+	pend   func(text string, pend bool)
+	trim   bool
 }
 
 func (v *secretRefValue) Type() string {

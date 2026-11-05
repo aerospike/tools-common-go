@@ -55,11 +55,9 @@ func NewTLSConfig(rootCA [][]byte, cert, key, keyPass []byte, minV, maxV TLSProt
 	}
 }
 
+// NewGoTLSConfig returns the tls.Config for tc. Without a CA, the server is
+// verified against the system roots.
 func (tc *TLSConfig) NewGoTLSConfig() (*tls.Config, error) {
-	if len(tc.RootCA) == 0 && len(tc.Cert) == 0 && len(tc.Key) == 0 {
-		return nil, nil
-	}
-
 	var (
 		clientPool []tls.Certificate
 		serverPool *x509.CertPool
