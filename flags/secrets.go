@@ -33,10 +33,10 @@ var errSecretsNotTracked = errors.New("secret references are not tracked, use Ne
 // its form, secrets: included, is read. --password is used as given.
 //
 // --password is read only with a user and an auth mode other than PKI, and
-// --tls-keyfile-password only with a key file. Otherwise the value is dropped,
-// and a --password source or secrets: value without a user is reported to the
-// warning handler. PKI drops the user, and the TLS options are read only with
-// --tls-enable.
+// --tls-keyfile-password only with --tls-enable and a key file. Otherwise the
+// value is dropped, and a --password source or secrets: value without a user
+// is reported to the warning handler. PKI drops the user, and the TLS options
+// are read only with --tls-enable.
 // --password must be at most 63 bytes and --tls-keyfile-password at most 1024
 // bytes, whatever their source. Errors name the option, or the config file key
 // when the value came from the config file.
