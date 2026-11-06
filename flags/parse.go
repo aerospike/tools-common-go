@@ -20,10 +20,20 @@ var (
 	ErrEnvironmentVariableNotFound = fmt.Errorf("environment variable not found")
 )
 
+type envNotSetError string
+
+func (e envNotSetError) Error() string {
+	return "environment variable " + string(e) + " is not set or empty"
+}
+
+func (envNotSetError) Is(target error) bool {
+	return target == ErrEnvironmentVariableNotFound
+}
+
 func fromEnv(v string) (string, error) {
 	result := os.Getenv(v)
 	if result == "" {
-		return "", ErrEnvironmentVariableNotFound
+		return "", envNotSetError(v)
 	}
 
 	return result, nil

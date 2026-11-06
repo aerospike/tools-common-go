@@ -2,11 +2,15 @@ package flags
 
 import (
 	"crypto/tls"
+	"io"
+	"net"
 	"os"
 	"testing"
+	"time"
 
 	as "github.com/aerospike/aerospike-client-go/v8"
 	"github.com/aerospike/tools-common-go/client"
+	"github.com/stretchr/testify/require"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -327,4 +331,124 @@ func (s *FlagsTestSuite) TestNewAerospikeConfig() {
 // a normal test function and pass our suite to suite.Run
 func TestRunFlagsTestSuite(t *testing.T) {
 	suite.Run(t, new(FlagsTestSuite))
+}
+
+func TestAuthModeRequiresTLS(t *testing.T) {
+	t.Parallel()
+
+	const needsTLS = "TLS is required for external or PKI authentication"
+
+	tests := map[string]struct {
+		wantErr string
+		args    []string
+		mode    as.AuthMode
+		tls     bool
+	}{
+		"EXTERNAL without TLS": {args: []string{"--auth", "EXTERNAL"}, wantErr: needsTLS},
+		"PKI without TLS":      {args: []string{"--auth", "PKI"}, wantErr: needsTLS},
+		"EXTERNAL with TLS": {
+			args: []string{"--auth", "EXTERNAL", "--tls-enable"}, mode: as.AuthModeExternal, tls: true,
+		},
+		"EXTERNAL_INSECURE without TLS": {args: []string{"--auth", "EXTERNAL_INSECURE"}, mode: as.AuthModeExternal},
+		"EXTERNAL_INSECURE with TLS": {
+			args: []string{"--auth", "EXTERNAL_INSECURE", "--tls-enable"}, mode: as.AuthModeExternal, tls: true,
+		},
+		"INTERNAL without TLS": {args: []string{"--auth", "INTERNAL"}, mode: as.AuthModeInternal},
+		"INTERNAL with TLS": {
+			args: []string{"--auth", "INTERNAL", "--tls-enable"}, mode: as.AuthModeInternal, tls: true,
+		},
+		"PKI with TLS": {args: []string{"--auth", "PKI", "--tls-enable"}, mode: as.AuthModePKI, tls: true},
+	}
+
+	for name, tt := range tests {
+		t.Run(name, func(t *testing.T) {
+			t.Parallel()
+
+			af := NewDefaultAerospikeFlags()
+			require.NoError(t, af.NewFlagSet(DefaultWrapHelpString).Parse(append(tt.args, "-U", "admin", "-P", "admin")))
+
+			policy, err := af.NewAerospikeConfig().NewClientPolicy()
+			if tt.wantErr != "" {
+				require.EqualError(t, err, tt.wantErr)
+				return
+			}
+
+			require.NoError(t, err)
+			require.Equal(t, tt.mode, policy.AuthMode)
+
+			if tt.tls {
+				require.NotNil(t, policy.TlsConfig, "--tls-enable must not dial plain TCP")
+			} else {
+				require.Nil(t, policy.TlsConfig)
+			}
+		})
+	}
+}
+
+func TestTLSEnableAloneSpeaksTLS(t *testing.T) {
+	t.Parallel()
+
+	for _, mode := range []string{"INTERNAL", "EXTERNAL"} {
+		t.Run(mode, func(t *testing.T) {
+			t.Parallel()
+
+			listener, err := net.Listen("tcp", "127.0.0.1:0")
+			require.NoError(t, err)
+			t.Cleanup(func() { listener.Close() })
+
+			af := NewDefaultAerospikeFlags()
+			require.NoError(t, af.NewFlagSet(DefaultWrapHelpString).Parse([]string{
+				"--host", listener.Addr().String(), "--auth", mode, "--tls-enable", "-U", "admin", "-P", "admin",
+			}))
+
+			conf := af.NewAerospikeConfig()
+			policy, err := conf.NewClientPolicy()
+			require.NoError(t, err)
+
+			policy.Timeout = time.Second
+
+			done := make(chan struct{})
+
+			go func() {
+				defer close(done)
+
+				if c, err := as.NewClientWithPolicyAndHost(policy, conf.NewHosts()...); err == nil {
+					c.Close()
+				}
+			}()
+
+			t.Cleanup(func() { <-done })
+
+			require.NoError(t, listener.(*net.TCPListener).SetDeadline(time.Now().Add(5*time.Second)))
+
+			conn, err := listener.Accept()
+			require.NoError(t, err, "the client never connected")
+
+			defer conn.Close()
+
+			require.NoError(t, conn.SetReadDeadline(time.Now().Add(5*time.Second)))
+
+			first := make([]byte, 1)
+			_, err = io.ReadFull(conn, first)
+			require.NoError(t, err)
+			require.Equal(t, byte(0x16), first[0], "first byte is not a TLS handshake record")
+		})
+	}
+}
+
+func TestAuthModeUsage(t *testing.T) {
+	usage := NewDefaultAerospikeFlags().NewFlagSet(func(str string) string { return str }).Lookup("auth").Usage
+
+	require.Equal(t, "The authentication mode used by the Aerospike server."+
+		" INTERNAL uses standard user/pass. EXTERNAL uses external methods (like LDAP)"+
+		" which are configured on the server. EXTERNAL requires TLS. EXTERNAL_INSECURE is EXTERNAL"+
+		" without the TLS requirement: without TLS it sends the password in clear, and some tools"+
+		" still refuse it without TLS. PKI requires TLS, and allows TLS authentication and"+
+		" authorization based on a certificate. No username needs to be configured.", usage)
+}
+
+func TestAuthModeFromConfigFile(t *testing.T) {
+	af, _, err := loadToolConfig(t, "[cluster]\nauth = \"EXTERNAL_INSECURE\"\n", "")
+	require.NoError(t, err)
+	require.Equal(t, "EXTERNAL_INSECURE", af.AuthMode.String())
 }

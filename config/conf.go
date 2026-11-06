@@ -25,6 +25,12 @@ var configToFlagMap = map[string]string{}
 var fallbackSections = map[string]bool{}
 var confDirs = []string{".", DefaultConfDir}
 var confName = DefaultConfName
+var warningHandler func(msg string)
+
+// SetWarningHandler sets where warnings go. With nil, they go to standard error.
+func SetWarningHandler(handler func(msg string)) {
+	warningHandler = handler
+}
 
 // SetConfDirs sets the directories to search for the config file when a file
 // name is not explicitly provided. If a file name is explicitly provided viper
@@ -187,8 +193,7 @@ var (
 // than 3 levels deep is an error. Any other error inside an included
 // directory, such as an entry that cannot be parsed or a subdirectory that
 // cannot be read, fails the load, where the C tools skip the entry, since it
-// may hold the Secret Agent CA file. Warnings, such as for a file that cannot
-// be opened, are written to standard error.
+// may hold the Secret Agent CA file. Warnings go to SetWarningHandler.
 //
 // Values merge key by key, a later file wins, and the command line wins over
 // all files. A section bound with BindPFlagsWithInstanceFallback is selected in
@@ -373,7 +378,14 @@ func (l *configLoader) loadDir(from, dir string, level int) error {
 }
 
 func warnCannotRead(path string, err error) {
-	fmt.Fprintf(os.Stderr, "Warning: cannot read config file %s: %s\n", path, errnoText(err))
+	msg := fmt.Sprintf("cannot read config file %s: %s", path, errnoText(err))
+
+	if warningHandler != nil {
+		warningHandler(msg)
+		return
+	}
+
+	fmt.Fprintln(os.Stderr, "Warning: "+msg)
 }
 
 // checkSectionNames rejects a section that v, the viper of the file whose TOML

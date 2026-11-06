@@ -1,17 +1,24 @@
 package client
 
 import (
+	"errors"
+
 	as "github.com/aerospike/aerospike-client-go/v8"
 )
+
+var errAuthModeNeedsTLS = errors.New("TLS is required for external or PKI authentication")
 
 // AerospikeConfig represents the intermediate configuration for an Aerospike
 // client. This can be constructed directly using flags.AerospikeFlags or
 type AerospikeConfig struct {
-	TLS                  *TLSConfig
-	User                 string
-	Password             string
-	Seeds                HostTLSPortSlice
-	AuthMode             as.AuthMode
+	TLS      *TLSConfig
+	User     string
+	Password string
+	Seeds    HostTLSPortSlice
+	AuthMode as.AuthMode
+	// ExternalInsecure allows external authentication without TLS. The Go
+	// client's cluster still refuses it.
+	ExternalInsecure     bool
 	UseServicesAlternate bool
 }
 
@@ -25,6 +32,11 @@ func NewDefaultAerospikeConfig() *AerospikeConfig {
 // NewClientPolicy creates a new Aerospike client policy based on the
 // AerospikeConfig.
 func (ac *AerospikeConfig) NewClientPolicy() (*as.ClientPolicy, error) {
+	if ac.TLS == nil &&
+		(ac.AuthMode == as.AuthModePKI || (ac.AuthMode == as.AuthModeExternal && !ac.ExternalInsecure)) {
+		return nil, errAuthModeNeedsTLS
+	}
+
 	clientPolicy := as.NewClientPolicy()
 	clientPolicy.User = ac.User
 	clientPolicy.Password = ac.Password

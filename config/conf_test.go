@@ -625,6 +625,36 @@ func captureStderr(t *testing.T, fn func()) string {
 	return string(out)
 }
 
+func TestInitConfigFilesWarningHandler(t *testing.T) {
+	if os.Geteuid() == 0 {
+		t.Skip("root can read any file")
+	}
+
+	system, home := setupConfigFiles(t)
+	writeConfig(t, system, "[group1]\nstr = \"system\"\n")
+	require.NoError(t, os.Chmod(system, 0))
+	writeConfig(t, home, "[group1]\nint = 2\n")
+
+	var warnings []string
+
+	SetWarningHandler(func(msg string) { warnings = append(warnings, msg) })
+	t.Cleanup(func() { SetWarningHandler(nil) })
+
+	var err error
+
+	stderr := captureStderr(t, func() { _, err = InitConfigFiles(Files{}, "", newGroupFlags(t, "group1", false)) })
+	require.NoError(t, err)
+	require.Empty(t, stderr)
+	require.Equal(t, []string{"cannot read config file " + system + ": Permission denied"}, warnings)
+
+	SetWarningHandler(nil)
+	Reset()
+
+	stderr = captureStderr(t, func() { _, err = InitConfigFiles(Files{}, "", newGroupFlags(t, "group1", false)) })
+	require.NoError(t, err)
+	require.Equal(t, "Warning: cannot read config file "+system+": Permission denied\n", stderr)
+}
+
 func TestInitConfigFilesUnreadableDefaultFileSkipped(t *testing.T) {
 	if os.Geteuid() == 0 {
 		t.Skip("root can read any file")

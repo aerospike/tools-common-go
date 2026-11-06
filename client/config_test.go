@@ -17,7 +17,7 @@ func TestAerospikeConfig_NewClientPolicy(t *testing.T) {
 	config := &AerospikeConfig{
 		User:     "testUser",
 		Password: "testPassword",
-		AuthMode: as.AuthModeExternal,
+		AuthMode: as.AuthModeInternal,
 	}
 
 	expectedClientPolicy := as.NewClientPolicy()
@@ -37,6 +37,55 @@ func TestAerospikeConfig_NewClientPolicy(t *testing.T) {
 			clientPolicy,
 			expectedClientPolicy,
 		)
+	}
+}
+
+func TestAerospikeConfig_NewClientPolicyAuthModeNeedsTLS(t *testing.T) {
+	for _, mode := range []as.AuthMode{as.AuthModeExternal, as.AuthModePKI} {
+		config := &AerospikeConfig{AuthMode: mode}
+
+		_, err := config.NewClientPolicy()
+		if err == nil || err.Error() != "TLS is required for external or PKI authentication" {
+			t.Fatalf("NewClientPolicy() with auth mode %v error = %v, want the C client's TLS error", mode, err)
+		}
+
+		config.TLS = &TLSConfig{}
+
+		policy, err := config.NewClientPolicy()
+		if err != nil {
+			t.Fatalf("NewClientPolicy() with auth mode %v and TLS returned an unexpected error: %v", mode, err)
+		}
+
+		if policy.TlsConfig == nil {
+			t.Fatalf("NewClientPolicy() with auth mode %v and TLS returned a nil TlsConfig, which dials plain TCP", mode)
+		}
+	}
+}
+
+func TestTLSConfig_NewGoTLSConfigWithoutFiles(t *testing.T) {
+	tlsConfig, err := (&TLSConfig{
+		TLSProtocolsMinVersion: VersionTLSDefaultMin,
+		TLSProtocolsMaxVersion: VersionTLSDefaultMax,
+	}).NewGoTLSConfig()
+	if err != nil {
+		t.Fatalf("NewGoTLSConfig() returned an unexpected error: %v", err)
+	}
+
+	if tlsConfig == nil {
+		t.Fatal("NewGoTLSConfig() without a CA, cert or key returned nil, want a config with the system roots")
+	}
+
+	systemPool, err := x509.SystemCertPool()
+	if err == nil && !tlsConfig.RootCAs.Equal(systemPool) {
+		t.Errorf("NewGoTLSConfig() RootCAs = %v, want the system roots", tlsConfig.RootCAs)
+	}
+
+	if tlsConfig.InsecureSkipVerify || len(tlsConfig.Certificates) != 0 {
+		t.Errorf("NewGoTLSConfig() = %+v, want server verification and no client certificate", tlsConfig)
+	}
+
+	if tlsConfig.MinVersion != tls.VersionTLS12 || tlsConfig.MaxVersion != tls.VersionTLS13 {
+		t.Errorf("NewGoTLSConfig() versions = %x-%x, want TLS 1.2-1.3", tlsConfig.MinVersion, tlsConfig.MaxVersion)
 	}
 }
 

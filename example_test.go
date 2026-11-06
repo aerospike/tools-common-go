@@ -41,7 +41,7 @@ var confTomlTemplate = `
 host = "1.1.1.1:3001,2.2.2.2:3002,3.3.3.3"
 user = "` + defaultUser + `"
 password = "` + defaultPassword + `"
-auth = "EXTERNAL"
+auth = "EXTERNAL_INSECURE"
 
 [cluster_tls]
 port = 4333
@@ -91,7 +91,7 @@ cluster:
   host: "1.1.1.1:3001,2.2.2.2:3002,3.3.3.3"
   user: "` + defaultUser + `"
   password: "default-password"
-  auth: "EXTERNAL"
+  auth: "EXTERNAL_INSECURE"
 
 cluster_tls:
   port: 4333

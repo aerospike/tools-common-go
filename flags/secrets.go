@@ -33,10 +33,10 @@ var errSecretsNotTracked = errors.New("secret references are not tracked, use Ne
 // its form, secrets: included, is read. --password is used as given.
 //
 // --password is read only with a user and an auth mode other than PKI, and
-// --tls-keyfile-password only with a key file. Otherwise the value is dropped,
-// and a --password source or secrets: value without a user is reported to the
-// warning handler. secrets: values of the TLS options are fetched only with
-// --tls-enable.
+// --tls-keyfile-password only with --tls-enable and a key file. Otherwise the
+// value is dropped, and a --password source or secrets: value without a user
+// is reported to the warning handler. PKI drops the user, and the TLS options
+// are read only with --tls-enable.
 // --password must be at most 63 bytes and --tls-keyfile-password at most 1024
 // bytes, whatever their source. Errors name the option, or the config file key
 // when the value came from the config file.
@@ -65,6 +65,15 @@ func (af *AerospikeFlags) ResolveSecrets(ctx context.Context, sa *SecretAgentFla
 		if !password.used {
 			af.dropPassword(password)
 		}
+	}
+
+	if af.AuthMode == AuthModeFlag(as.AuthModePKI) {
+		af.User = ""
+		af.secretRefs.user = false
+	}
+
+	if err := af.readTLSFiles(); err != nil {
+		return err
 	}
 
 	if err := af.fetchSecrets(ctx, sa); err != nil {
@@ -151,9 +160,52 @@ func (af *AerospikeFlags) optionLabel(name string) string {
 type secretRefs struct {
 	flagSet                                                            *pflag.FlagSet
 	warn                                                               func(msg string)
+	tlsFileText                                                        map[string]string
+	tlsFileSet                                                         map[string]func(string) error
 	user, password, tlsCAFile, tlsCertFile, tlsKeyFile, tlsKeyFilePass bool
 	unreadPassword, unreadTLSKeyFilePass                               bool
 	tracked                                                            bool
+}
+
+var tlsFileOptions = []string{"tls-cafile", "tls-capath", "tls-certfile", "tls-keyfile"}
+
+func (af *AerospikeFlags) readTLSFiles() error {
+	texts := af.secretRefs.tlsFileText
+
+	if !af.TLSEnable {
+		clear(texts)
+		return nil
+	}
+
+	for _, name := range tlsFileOptions {
+		text, ok := texts[name]
+		if !ok {
+			continue
+		}
+
+		if err := af.secretRefs.tlsFileSet[name](text); err != nil {
+			return fmt.Errorf("%s: %w", af.optionLabel(name), err)
+		}
+
+		delete(texts, name)
+	}
+
+	return nil
+}
+
+func (af *AerospikeFlags) keyFileGiven() bool {
+	_, pending := af.secretRefs.tlsFileText["tls-keyfile"]
+	return pending || len(af.TLSKeyFile) != 0
+}
+
+func (af *AerospikeFlags) pendTLSFile(name string) func(text string, pend bool) {
+	return func(text string, pend bool) {
+		if pend {
+			af.secretRefs.tlsFileText[name] = text
+		} else {
+			delete(af.secretRefs.tlsFileText, name)
+		}
+	}
 }
 
 // passwordOption is --password or --tls-keyfile-password. unread is set while
@@ -191,7 +243,7 @@ func (af *AerospikeFlags) passwordOptions() []passwordOption {
 			label:     af.optionLabel("tls-keyfile-password"),
 			ref:       refText(af.secretRefs.tlsKeyFilePass, af.TLSKeyFilePass),
 			maxLen:    tlsKeyFilePasswordMaxLen,
-			used:      len(af.TLSKeyFile) != 0,
+			used:      af.TLSEnable && af.keyFileGiven(),
 			firstLine: true,
 		},
 	}
@@ -250,15 +302,41 @@ func (af *AerospikeFlags) secretTargets() []secretTarget {
 // with surrounding whitespace trimmed, for ResolveSecrets to read once the
 // user, auth mode and key file are known.
 func (af *AerospikeFlags) trackSecretRefs(f *pflag.FlagSet) {
+	af.secretRefs.tlsFileText = map[string]string{}
+	af.secretRefs.tlsFileSet = map[string]func(string) error{}
+
+	for _, name := range tlsFileOptions {
+		af.secretRefs.tlsFileSet[name] = f.Lookup(name).Value.Set
+	}
+
 	for _, target := range af.secretTargets() {
 		flag := f.Lookup(target.name)
-		flag.Value = &secretRefValue{
+		value := &secretRefValue{
 			Value: flag.Value, isRef: target.isRef, unread: target.unread, setRaw: target.set, trim: target.trim,
 		}
+
+		if _, ok := af.secretRefs.tlsFileSet[target.name]; ok {
+			value.pend = af.pendTLSFile(target.name)
+		}
+
+		flag.Value = value
 	}
+
+	capath := f.Lookup("tls-capath")
+	capath.Value = &tlsPathValue{Value: capath.Value, pend: af.pendTLSFile("tls-capath")}
 
 	af.secretRefs.flagSet = f
 	af.secretRefs.tracked = true
+}
+
+type tlsPathValue struct {
+	pflag.Value
+	pend func(text string, pend bool)
+}
+
+func (v *tlsPathValue) Set(val string) error {
+	v.pend(val, true)
+	return nil
 }
 
 type secretRefValue struct {
@@ -266,6 +344,7 @@ type secretRefValue struct {
 	isRef  *bool
 	unread *bool
 	setRaw func(string)
+	pend   func(text string, pend bool)
 	trim   bool
 }
 
@@ -285,12 +364,18 @@ func (v *secretRefValue) Set(val string) error {
 
 	isRef := secretagent.IsSecret(val)
 
+	if v.pend != nil {
+		v.pend(val, !isRef)
+	}
+
 	switch {
 	case v.unread != nil:
 		v.setRaw(val)
 		*v.unread = !isRef
 	case isRef:
 		v.setRaw(val)
+	case v.pend != nil:
+		v.setRaw("")
 	default:
 		if err := v.Value.Set(val); err != nil {
 			return err

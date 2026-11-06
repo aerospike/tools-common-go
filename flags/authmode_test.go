@@ -50,7 +50,19 @@ func (s *AuthModeTestSuite) TestAuthModeFlag() {
 			s.NoError(actual.Set(tc.input))
 			s.Equal(actual, tc.output)
 			s.Equal(actual.String(), strings.ToUpper(tc.input))
-			s.Equal(actual.Type(), "INTERNAL,EXTERNAL,PKI")
+			s.Equal("INTERNAL,EXTERNAL,EXTERNAL_INSECURE,PKI", actual.Type())
+		})
+	}
+}
+
+func (s *AuthModeTestSuite) TestExternalInsecureAuthMode() {
+	for _, input := range []string{"EXTERNAL_INSECURE", "external_insecure"} {
+		s.T().Run(input, func(_ *testing.T) {
+			var actual AuthModeFlag
+
+			s.Require().NoError(actual.Set(input))
+			s.Equal("EXTERNAL_INSECURE", actual.String())
+			s.NotEqual(AuthModeFlag(as.AuthModeExternal), actual)
 		})
 	}
 }
