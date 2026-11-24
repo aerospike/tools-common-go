@@ -385,11 +385,10 @@ func (s *ConfTestSuite) TestConfigFileTLS() {
 	keyPem := pem.EncodeToMemory(block)
 	cert, _ := tls.X509KeyPair([]byte(s.certTxt), keyPem)
 	expectedClientConf.TlsConfig = &tls.Config{
-		MinVersion:               tls.VersionTLS12,
-		MaxVersion:               tls.VersionTLS13,
-		PreferServerCipherSuites: true,
-		RootCAs:                  expectedServerPool,
-		Certificates:             []tls.Certificate{cert},
+		MinVersion:   tls.VersionTLS12,
+		MaxVersion:   tls.VersionTLS13,
+		RootCAs:      expectedServerPool,
+		Certificates: []tls.Certificate{cert},
 	}
 
 	expectedClientHosts := []*as.Host{

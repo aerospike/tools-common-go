@@ -1,6 +1,6 @@
 version: "2"
 run:
-  go: "1.24"
+  go: "1.26"
   issues-exit-code: 1
   build-tags:
     - e2e
@@ -37,6 +37,7 @@ linters:
     goconst:
       min-len: 2
       min-occurrences: 3
+      ignore-tests: true
     gocritic:
       enabled-tags:
         - diagnostic

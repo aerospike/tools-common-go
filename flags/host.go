@@ -120,7 +120,7 @@ func (slice *HostTLSPortSliceFlag) Replace(vals []string) error {
 
 // GetSlice returns the flag value list as an array of strings.
 func (slice *HostTLSPortSliceFlag) GetSlice() []string {
-	strs := []string{}
+	strs := make([]string, 0, len(slice.Seeds))
 
 	for _, elem := range slice.Seeds {
 		strs = append(strs, elem.String())

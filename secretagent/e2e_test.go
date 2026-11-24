@@ -709,6 +709,7 @@ func encryptedKeyFile(t *testing.T, keyFile, password string) string {
 	require.NoError(t, err)
 
 	path := filepath.Join(t.TempDir(), "encrypted-key.pem")
+	//nolint:gosec // G703: path is a fixed name under t.TempDir().
 	require.NoError(t, os.WriteFile(path, pem.EncodeToMemory(encrypted), 0o600))
 
 	return path
