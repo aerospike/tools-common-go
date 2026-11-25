@@ -56,7 +56,7 @@ func (ac *AerospikeConfig) NewClientPolicy() (*as.ClientPolicy, error) {
 }
 
 func (ac *AerospikeConfig) NewHosts() []*as.Host {
-	hosts := []*as.Host{}
+	hosts := make([]*as.Host, 0, len(ac.Seeds))
 
 	for _, seed := range ac.Seeds {
 		host := as.NewHost(seed.Host, seed.Port)

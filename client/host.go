@@ -43,7 +43,7 @@ func (addr *HostTLSPort) String() string {
 type HostTLSPortSlice []*HostTLSPort
 
 func (slice *HostTLSPortSlice) String() string {
-	strs := []string{}
+	strs := make([]string, 0, len(*slice))
 
 	for _, elem := range *slice {
 		strs = append(strs, elem.String())

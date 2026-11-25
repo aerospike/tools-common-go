@@ -73,13 +73,12 @@ func (tc *TLSConfig) NewGoTLSConfig() (*tls.Config, error) {
 		}
 	}
 
-	tlsConfig := &tls.Config{ //nolint:gosec // aerospike default tls version is TLSv1.2
-		Certificates:             clientPool,
-		RootCAs:                  serverPool,
-		InsecureSkipVerify:       false,
-		PreferServerCipherSuites: true,
-		MinVersion:               uint16(tc.TLSProtocolsMinVersion),
-		MaxVersion:               uint16(tc.TLSProtocolsMaxVersion),
+	tlsConfig := &tls.Config{
+		Certificates:       clientPool,
+		RootCAs:            serverPool,
+		InsecureSkipVerify: false,
+		MinVersion:         uint16(tc.TLSProtocolsMinVersion),
+		MaxVersion:         uint16(tc.TLSProtocolsMaxVersion),
 	}
 
 	return tlsConfig, nil
@@ -106,8 +105,6 @@ func LoadCACerts(certsBytes [][]byte) *x509.CertPool {
 // returns parsed server certificate
 // if the private key is encrypted, it will be decrypted using key file passphrase
 func LoadServerCertAndKey(certFileBytes, keyFileBytes, keyPassBytes []byte) ([]tls.Certificate, error) {
-	var certificates []tls.Certificate
-
 	// Decode PEM data
 	keyBlock, _ := pem.Decode(keyFileBytes)
 
@@ -138,7 +135,5 @@ func LoadServerCertAndKey(certFileBytes, keyFileBytes, keyPassBytes []byte) ([]t
 		return nil, fmt.Errorf("failed to add certificate and key to the pool: `%s`", err)
 	}
 
-	certificates = append(certificates, cert)
-
-	return certificates, nil
+	return []tls.Certificate{cert}, nil
 }
