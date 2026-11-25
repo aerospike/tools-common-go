@@ -328,7 +328,7 @@ func TestLoadCACerts(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			actualOutput := LoadCACerts(tc.certsBytes)
 
-			if !reflect.DeepEqual(actualOutput, tc.expectedOutput) {
+			if !actualOutput.Equal(tc.expectedOutput) {
 				t.Errorf("loadCACerts() output = %v, want %v", actualOutput, tc.expectedOutput)
 			}
 		})
