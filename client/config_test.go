@@ -305,12 +305,13 @@ func errorsEqual(err1, err2 error) bool {
 }
 
 func TestLoadCACerts(t *testing.T) {
-	cert1 := []byte("fakecert1")
-	cert2 := []byte("fakecert2")
-	expectedPool, _ := x509.SystemCertPool()
+	cert, err := testutils.GenerateCert()
+	if err != nil {
+		t.Fatal(err)
+	}
 
-	expectedPool.AppendCertsFromPEM(cert1)
-	expectedPool.AppendCertsFromPEM(cert2)
+	expectedPool, _ := x509.SystemCertPool()
+	expectedPool.AppendCertsFromPEM(cert)
 
 	testCases := []struct {
 		name           string
@@ -319,7 +320,7 @@ func TestLoadCACerts(t *testing.T) {
 	}{
 		{
 			name:           "ValidCerts",
-			certsBytes:     [][]byte{cert1, cert2},
+			certsBytes:     [][]byte{cert},
 			expectedOutput: expectedPool,
 		},
 	}

@@ -73,10 +73,10 @@ linters:
         path: asconfig/asconfig_test\.go
       - linters:
           - govet
-        path: (.+)test\.go
+        path: (.+)_test\.go
       - linters:
           - goconst
-        path: (.+)test\.go
+        path: (.+)_test\.go
       - linters:
           - lll
         source: '// '
